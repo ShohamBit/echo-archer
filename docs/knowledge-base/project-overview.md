@@ -16,8 +16,8 @@ presentation.
 - The player moves with WASD or arrow keys, aims with the mouse, and shoots with left mouse.
 - HP drains over time through Echo Decay, so HP is also the run timer pressure.
 - Enemies also damage the player on contact.
-- Death opens a run summary, then a skill-tree screen.
-- One permanent upgrade exists: `Sharper Arrows I`, which increases arrow damage by 20%.
+- Death opens a run summary, then a skill-tree screen with multiple upgrade cards.
+- Permanent upgrades currently improve damage, max HP, fire rate, and Echo Decay.
 - Save data stores permanent shards, owned upgrades, best time, and loop count.
 
 ## Naming
@@ -32,7 +32,6 @@ own isolated refactor.
 
 Good next feature candidates:
 
-- Add more permanent upgrades: max HP, lower Echo Decay, faster fire rate.
 - Add a real skill-tree layout instead of one upgrade card.
 - Add a dash.
 - Add a second enemy type with a different shape and behavior.

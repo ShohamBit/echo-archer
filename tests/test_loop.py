@@ -3,7 +3,7 @@ import pytest
 from loop_archer import config
 from loop_archer.input import InputState
 from loop_archer.models import DeathReason, Enemy, GameMode, Vec2, new_game_state
-from loop_archer.systems import begin_next_loop, update_world
+from loop_archer.systems import begin_next_loop, current_echo_decay_rate, update_world
 
 
 def advance_world(state, seconds):
@@ -78,3 +78,12 @@ def test_echo_decay_can_end_the_loop_with_echo_faded_reason():
 
     assert state.mode is GameMode.DEAD_SUMMARY
     assert state.last_run_summary.death_reason is DeathReason.ECHO_FADED
+
+
+def test_echo_decay_rate_uses_player_stat_multiplier():
+    state = new_game_state(owned_upgrades={"stable_echo"})
+
+    assert current_echo_decay_rate(
+        config.ECHO_DECAY_GRACE_SECONDS + 1.0,
+        state.player_stats,
+    ) == pytest.approx(config.BASE_ECHO_DECAY_PER_SECOND * 0.8)

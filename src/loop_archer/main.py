@@ -66,7 +66,7 @@ class GameApp:
         self.state = load_game()
         self.open_upgrades_button = Button(pygame.Rect(0, 0, 260, 48), "Open Skill Tree")
         self.restart_button = Button(pygame.Rect(0, 0, 200, 48), "Start Loop")
-        self.buy_button = Button(pygame.Rect(0, 0, 210, 48), "Buy Upgrade")
+        self.upgrade_card_rects: dict[str, pygame.Rect] = {}
         self._layout_buttons()
         self._sync_arena_radius()
 
@@ -118,12 +118,15 @@ class GameApp:
             if self.open_upgrades_button.was_clicked(event):
                 self.state.mode = GameMode.UPGRADE
         elif self.state.mode is GameMode.UPGRADE:
-            if self.buy_button.was_clicked(event):
-                apply_upgrade(self.state, "sharper_arrows_1")
-                save_game(self.state)
-            elif self.restart_button.was_clicked(event):
+            if self.restart_button.was_clicked(event):
                 begin_next_loop(self.state)
                 save_game(self.state)
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                for upgrade_id, rect in self.upgrade_card_rects.items():
+                    if rect.collidepoint(event.pos):
+                        apply_upgrade(self.state, upgrade_id)
+                        save_game(self.state)
+                        break
 
     def _toggle_fullscreen(self) -> None:
         self.fullscreen = not self.fullscreen
@@ -139,7 +142,6 @@ class GameApp:
         cx = width // 2
         cy = height // 2
         self.open_upgrades_button.rect.center = (cx, cy + 112)
-        self.buy_button.rect.center = (cx, cy + 30)
         self.restart_button.rect.center = (cx, cy + 200)
 
     def _sync_arena_radius(self) -> None:
@@ -261,7 +263,10 @@ class GameApp:
         self._text(f"Run shards {self.state.run_shards}", 28, 58, self.small_font, SHARD)
         self._text(f"Total shards {self.state.total_shards}", 28, 80, self.small_font, TEXT)
         self._text(f"Damage {self.state.player_stats.damage}", 28, 102, self.small_font, ARROW)
-        decay_rate = current_echo_decay_rate(self.state.run_timer)
+        decay_rate = current_echo_decay_rate(
+            self.state.run_timer,
+            self.state.player_stats,
+        )
         decay_label = (
             "Echo Decay: Grace"
             if decay_rate <= 0
@@ -312,25 +317,64 @@ class GameApp:
         self._center_text("SKILL TREE", panel_y + 54, self.big_font)
         self._center_text(f"Available shards: {self.state.total_shards}", panel_y + 116, self.font, SHARD)
 
-        upgrade = UPGRADE_DEFINITIONS["sharper_arrows_1"]
-        owned = upgrade.id in self.state.owned_upgrades
-        card = pygame.Rect(width // 2 - 170, panel_y + 166, 340, 86)
-        pygame.draw.rect(self.screen, (31, 36, 48), card, border_radius=6)
-        pygame.draw.rect(self.screen, (101, 128, 172), card, 2, border_radius=6)
-        self._center_text(upgrade.name, panel_y + 188, self.font)
-        self._center_text("+20% arrow damage", panel_y + 218, self.small_font, ARROW)
-        status = "Owned" if owned else f"Cost: {upgrade.cost} shards"
-        self._center_text(status, panel_y + 240, self.small_font, MUTED)
-
-        if owned or self.state.total_shards < upgrade.cost:
-            pygame.draw.rect(self.screen, LOCKED, self.buy_button.rect, border_radius=6)
-            label = "Owned" if owned else "Need Shards"
-            text = self.font.render(label, True, MUTED)
-            self.screen.blit(text, text.get_rect(center=self.buy_button.rect.center))
-        else:
-            self.buy_button.draw(self.screen, self.font)
+        self.upgrade_card_rects = {}
+        card_width = 250
+        card_height = 88
+        card_gap = 18
+        start_x = width // 2 - card_width - card_gap // 2
+        start_y = panel_y + 156
+        for index, upgrade in enumerate(UPGRADE_DEFINITIONS.values()):
+            column = index % 2
+            row = index // 2
+            rect = pygame.Rect(
+                start_x + column * (card_width + card_gap),
+                start_y + row * (card_height + card_gap),
+                card_width,
+                card_height,
+            )
+            self.upgrade_card_rects[upgrade.id] = rect
+            self._draw_upgrade_card(rect, upgrade)
 
         self.restart_button.draw(self.screen, self.font)
+
+    def _draw_upgrade_card(self, rect: pygame.Rect, upgrade) -> None:
+        owned = upgrade.id in self.state.owned_upgrades
+        missing_prereq = any(
+            item not in self.state.owned_upgrades for item in upgrade.prerequisites
+        )
+        affordable = self.state.total_shards >= upgrade.cost
+        can_buy = not owned and not missing_prereq and affordable
+
+        mouse = pygame.mouse.get_pos()
+        if owned:
+            fill = (28, 48, 42)
+            border = (94, 174, 131)
+        elif can_buy and rect.collidepoint(mouse):
+            fill = (44, 57, 80)
+            border = (136, 164, 218)
+        elif can_buy:
+            fill = (31, 36, 48)
+            border = (101, 128, 172)
+        else:
+            fill = (27, 30, 38)
+            border = (66, 72, 88)
+
+        pygame.draw.rect(self.screen, fill, rect, border_radius=6)
+        pygame.draw.rect(self.screen, border, rect, 2, border_radius=6)
+        self._text(upgrade.branch, rect.x + 12, rect.y + 9, self.small_font, MUTED)
+        self._text(upgrade.name, rect.x + 12, rect.y + 30, self.small_font, TEXT)
+        self._text(upgrade.description, rect.x + 12, rect.y + 52, self.small_font, ARROW)
+
+        if owned:
+            status = "Owned"
+        elif missing_prereq:
+            status = "Locked"
+        elif affordable:
+            status = f"Buy: {upgrade.cost}"
+        else:
+            status = f"Need: {upgrade.cost}"
+        label = self.small_font.render(status, True, SHARD if can_buy else MUTED)
+        self.screen.blit(label, (rect.right - label.get_width() - 12, rect.y + 10))
 
     def _draw_overlay_panel(self, x: int, y: int, w: int, h: int) -> None:
         width, height = self.screen.get_size()

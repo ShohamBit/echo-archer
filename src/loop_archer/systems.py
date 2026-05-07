@@ -80,13 +80,16 @@ def update_world(state: GameState, input_state: InputState, dt: float) -> None:
         end_run(state)
 
 
-def current_echo_decay_rate(run_timer: float) -> float:
+def current_echo_decay_rate(run_timer: float, player_stats=None) -> float:
     if run_timer < config.ECHO_DECAY_GRACE_SECONDS:
         return 0.0
     ramp_time = max(0.0, run_timer - config.ECHO_DECAY_RAMP_START_SECONDS)
-    return config.BASE_ECHO_DECAY_PER_SECOND + (
+    base_rate = config.BASE_ECHO_DECAY_PER_SECOND + (
         ramp_time * config.ECHO_DECAY_RAMP_PER_SECOND
     )
+    if player_stats is None:
+        return base_rate
+    return base_rate * player_stats.echo_decay_multiplier
 
 
 def _apply_echo_decay(state: GameState, previous_time: float, current_time: float) -> None:
@@ -98,7 +101,9 @@ def _apply_echo_decay(state: GameState, previous_time: float, current_time: floa
     if active_seconds <= 0:
         return
 
-    state.player.hp -= current_echo_decay_rate(current_time) * active_seconds
+    state.player.hp -= (
+        current_echo_decay_rate(current_time, state.player_stats) * active_seconds
+    )
     if state.player.hp <= 0 and state.pending_death_reason is None:
         state.pending_death_reason = DeathReason.ECHO_FADED
 

@@ -71,4 +71,10 @@ The death summary is an overlay panel showing:
 - enemies defeated
 - shards gained
 
-The upgrade screen is currently one card: `Sharper Arrows I`.
+The upgrade screen currently shows clickable upgrade cards. Cards display branch,
+name, description, and status:
+
+- `Owned`
+- `Locked`
+- `Buy: <cost>`
+- `Need: <cost>`

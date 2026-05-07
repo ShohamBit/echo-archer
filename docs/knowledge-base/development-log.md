@@ -45,3 +45,12 @@ Changed HUD layout:
 - removed numeric HP from the HUD
 - kept metrics in the top-left
 - added layout test for the health bar placement
+
+## feat: add core upgrade choices
+
+Expanded permanent progression:
+
+- added `Sharper Arrows II`, `Vital Echo`, `Stable Echo`, and `Quick Draw I`
+- extended player stats for max HP, fire rate, and Echo Decay multiplier
+- updated the upgrade screen from one card to multiple clickable cards
+- added tests for upgrade effects, prerequisite locking, and Echo Decay scaling

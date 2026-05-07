@@ -13,6 +13,7 @@ Current stats come from `config.py` plus owned permanent upgrades:
 - arrow speed
 - pickup radius
 - invincibility seconds
+- Echo Decay multiplier
 
 The player is clamped inside the arena with `clamp_to_arena(position, arena_radius)`.
 
@@ -82,9 +83,13 @@ Survival bonus is `int(run_timer // 10)`.
 
 Upgrade definitions live in `upgrades.py`.
 
-Current upgrade:
+Current upgrades:
 
 - `sharper_arrows_1`: `Sharper Arrows I`, costs 5 shards, multiplies damage by 1.2.
+- `sharper_arrows_2`: `Sharper Arrows II`, costs 10 shards, requires `Sharper Arrows I`, multiplies damage by 1.2.
+- `vital_echo`: `Vital Echo`, costs 8 shards, adds 25 max HP.
+- `stable_echo`: `Stable Echo`, costs 8 shards, reduces Echo Decay by 20%.
+- `quick_draw_1`: `Quick Draw I`, costs 8 shards, increases fire rate by 20%.
 
 `build_player_stats()` reapplies owned upgrades from scratch. Keep this pattern
 when adding new permanent stat upgrades.

@@ -62,6 +62,7 @@ class PlayerStats:
     arrow_speed: float = config.BASE_ARROW_SPEED
     pickup_radius: float = config.INITIAL_PICKUP_RADIUS
     invincibility_seconds: float = config.PLAYER_INVINCIBILITY
+    echo_decay_multiplier: float = 1.0
 
 
 @dataclass
@@ -121,8 +122,12 @@ class UpgradeDefinition:
     name: str
     branch: str
     cost: int
+    description: str
     prerequisites: tuple[str, ...] = ()
     damage_multiplier: float = 1.0
+    max_hp_bonus: int = 0
+    fire_rate_multiplier: float = 1.0
+    echo_decay_multiplier: float = 1.0
 
 
 @dataclass
@@ -165,11 +170,27 @@ def build_player_stats(owned_upgrades: set[str] | None = None) -> PlayerStats:
     from loop_archer.upgrades import UPGRADE_DEFINITIONS
 
     stats = PlayerStats()
-    for upgrade_id in owned_upgrades or set():
+    damage_multiplier = 1.0
+    fire_rate_multiplier = 1.0
+    echo_decay_multiplier = 1.0
+    max_hp_bonus = 0
+
+    for upgrade_id in sorted(owned_upgrades or set()):
         definition = UPGRADE_DEFINITIONS.get(upgrade_id)
         if definition is None:
             continue
-        stats.damage = round(stats.damage * definition.damage_multiplier)
+        damage_multiplier *= definition.damage_multiplier
+        fire_rate_multiplier *= definition.fire_rate_multiplier
+        echo_decay_multiplier *= definition.echo_decay_multiplier
+        max_hp_bonus += definition.max_hp_bonus
+
+    stats.damage = round(stats.damage * damage_multiplier)
+    stats.fire_rate = round(stats.fire_rate * fire_rate_multiplier, 3)
+    stats.echo_decay_multiplier = round(
+        stats.echo_decay_multiplier * echo_decay_multiplier,
+        3,
+    )
+    stats.max_hp += max_hp_bonus
     return stats
 
 

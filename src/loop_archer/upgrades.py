@@ -11,8 +11,42 @@ UPGRADE_DEFINITIONS: dict[str, UpgradeDefinition] = {
         name="Sharper Arrows I",
         branch="Archer",
         cost=5,
+        description="+20% arrow damage",
         damage_multiplier=1.2,
-    )
+    ),
+    "sharper_arrows_2": UpgradeDefinition(
+        id="sharper_arrows_2",
+        name="Sharper Arrows II",
+        branch="Archer",
+        cost=10,
+        description="+20% arrow damage",
+        prerequisites=("sharper_arrows_1",),
+        damage_multiplier=1.2,
+    ),
+    "vital_echo": UpgradeDefinition(
+        id="vital_echo",
+        name="Vital Echo",
+        branch="Survivor",
+        cost=8,
+        description="+25 max HP",
+        max_hp_bonus=25,
+    ),
+    "stable_echo": UpgradeDefinition(
+        id="stable_echo",
+        name="Stable Echo",
+        branch="Echo",
+        cost=8,
+        description="-20% Echo Decay",
+        echo_decay_multiplier=0.8,
+    ),
+    "quick_draw_1": UpgradeDefinition(
+        id="quick_draw_1",
+        name="Quick Draw I",
+        branch="Archer",
+        cost=8,
+        description="+20% fire rate",
+        fire_rate_multiplier=1.2,
+    ),
 }
 
 
