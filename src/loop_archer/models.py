@@ -20,6 +20,11 @@ class DeathReason(Enum):
     ECHO_FADED = "Echo Faded"
 
 
+class EnemyKind(Enum):
+    CHASER = "chaser"
+    FAST = "fast"
+
+
 @dataclass(frozen=True)
 class Vec2:
     x: float = 0.0
@@ -96,6 +101,7 @@ class Arrow:
 class Enemy:
     id: int
     position: Vec2
+    kind: EnemyKind = EnemyKind.CHASER
     hp: int = config.CHASER_HP
     speed: float = config.CHASER_SPEED
     damage: int = config.CHASER_DAMAGE

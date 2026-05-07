@@ -12,7 +12,7 @@ presentation.
 
 - The game starts fullscreen and can toggle fullscreen/windowed with `F11`.
 - The player is a warm circle in the center of a circular arena.
-- The current enemy type is a chaser rendered as a larger red triangle body.
+- Enemy types currently include red triangle chasers and fast diamond chasers.
 - The player moves with WASD or arrow keys, aims with the mouse, shoots with left mouse, and dashes with Space.
 - HP drains over time through Echo Decay, so HP is also the run timer pressure.
 - Enemies also damage the player on contact.
@@ -33,6 +33,5 @@ own isolated refactor.
 Good next feature candidates:
 
 - Add a real skill-tree layout instead of one upgrade card.
-- Add a second enemy type with a different shape and behavior.
 - Add projectile wrapping as an upgrade, not as a default rule.
 - Add settings, including an optional numeric HP display.

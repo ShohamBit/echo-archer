@@ -64,3 +64,13 @@ Added a core movement verb:
 - dash has a 2.5 second cooldown
 - HUD shows dash cooldown beside the health bar
 - added tests for dash movement, cooldown, aim fallback, and arena clamping
+
+## feat: add fast diamond enemy
+
+Added the second enemy type:
+
+- introduced `EnemyKind`
+- added fast enemy stats through `create_enemy()`
+- mixed fast enemies into later waves
+- rendered fast enemies as magenta diamonds
+- added tests for fast enemy stats and wave mixing

@@ -51,9 +51,14 @@ Projectile wrapping is not implemented yet. It is a good future upgrade hook.
 
 ## Enemies
 
-The only enemy type right now is the chaser.
+Enemy kinds are represented by `EnemyKind`.
 
-Current behavior:
+Current enemy types:
+
+- `CHASER`: red triangle, medium speed, medium HP, contact damage.
+- `FAST`: magenta diamond, low HP, higher speed, lower contact damage, better shard reward.
+
+Current shared behavior:
 
 - spawns around the arena edge
 - moves toward the player
@@ -61,15 +66,15 @@ Current behavior:
 - uses a separation force so enemies do not stack into one pile
 - drops shard pickups on death
 
-Enemy visuals are currently type-implied rather than type-driven: all enemies are
-drawn as chasers in `main.py`. When adding new enemy types, add an explicit enemy
-kind field before adding more render shapes.
+Enemy stats should be created through `create_enemy()` so kind-specific tuning
+stays centralized. Rendering branches on `enemy.kind` in `main.py`.
 
 ## Waves
 
 `_spawn_due_waves()` is timer-based. It increases wave size slowly and spawns
-enemies around the arena edge. Spawn tuning currently lives inside `systems.py`
-and can later move into authored wave data.
+enemies around the arena edge. Fast enemies start mixing into waves after the
+early chaser-only phase. Spawn tuning currently lives inside `systems.py` and can
+later move into authored wave data.
 
 ## Echo Decay
 

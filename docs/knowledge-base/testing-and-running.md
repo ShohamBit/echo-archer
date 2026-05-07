@@ -38,6 +38,7 @@ Current coverage focuses on:
 - upgrade purchase validation and stat application
 - persistence
 - enemy separation
+- enemy kind stats and wave mixing
 - dash movement, cooldown, aim fallback, and arena clamping
 - layout helpers for arena, HP bar, and dash indicator
 

@@ -49,12 +49,12 @@ Current visual identities:
 
 - player: warm circle
 - chaser enemy: larger red triangle body with a darker core and forward mark
+- fast enemy: magenta diamond body with a darker core
 - arrows: yellow line strokes
 - shards: cyan circles
 
 Future enemy shape ideas:
 
-- fast enemy: sharp diamond
 - tank enemy: square/block
 - shooter enemy: pentagon or hexagon
 - exploder enemy: spiky star

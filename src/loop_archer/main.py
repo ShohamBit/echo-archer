@@ -11,7 +11,7 @@ from loop_archer.layout import (
     dash_indicator_rect_for_screen,
     health_bar_rect_for_screen,
 )
-from loop_archer.models import GameMode, Vec2
+from loop_archer.models import EnemyKind, GameMode, Vec2
 from loop_archer.persistence import load_game, save_game
 from loop_archer.systems import begin_next_loop, current_echo_decay_rate, update_world
 from loop_archer.upgrades import UPGRADE_DEFINITIONS, apply_upgrade
@@ -25,6 +25,9 @@ PLAYER_HIT = (255, 245, 220)
 ENEMY = (208, 72, 78)
 ENEMY_HIT = (255, 170, 160)
 ENEMY_CORE = (102, 27, 37)
+FAST_ENEMY = (225, 96, 210)
+FAST_ENEMY_HIT = (255, 180, 244)
+FAST_ENEMY_CORE = (92, 31, 103)
 ARROW = (246, 218, 128)
 SHARD = (103, 210, 255)
 TEXT = (229, 235, 244)
@@ -205,7 +208,10 @@ class GameApp:
             )
 
         for enemy in self.state.enemies:
-            self._draw_chaser(enemy)
+            if enemy.kind is EnemyKind.FAST:
+                self._draw_fast_enemy(enemy)
+            else:
+                self._draw_chaser(enemy)
 
         color = PLAYER_HIT if (
             self.state.player.hit_flash_timer > 0
@@ -247,6 +253,30 @@ class GameApp:
             (255, 195, 158),
             self._world_to_screen(eye),
             max(3, int(radius * 0.14)),
+        )
+
+    def _draw_fast_enemy(self, enemy) -> None:
+        color = FAST_ENEMY_HIT if enemy.hit_flash_timer > 0 else FAST_ENEMY
+        to_player = (self.state.player.position - enemy.position).normalized()
+        if to_player.length() <= 0:
+            to_player = Vec2(1, 0)
+        angle = atan2(to_player.y, to_player.x)
+        side_angle = angle + 1.5708
+        radius = enemy.radius
+        points = [
+            enemy.position + Vec2(cos(angle), sin(angle)) * (radius * 1.55),
+            enemy.position + Vec2(cos(side_angle), sin(side_angle)) * (radius * 0.95),
+            enemy.position - Vec2(cos(angle), sin(angle)) * (radius * 1.15),
+            enemy.position - Vec2(cos(side_angle), sin(side_angle)) * (radius * 0.95),
+        ]
+        screen_points = [self._world_to_screen(point) for point in points]
+        pygame.draw.polygon(self.screen, color, screen_points)
+        pygame.draw.polygon(self.screen, (125, 41, 139), screen_points, 3)
+        pygame.draw.circle(
+            self.screen,
+            FAST_ENEMY_CORE,
+            self._world_to_screen(enemy.position),
+            max(4, int(radius * 0.3)),
         )
 
     def _draw_loop_glyph(self, center: tuple[int, int]) -> None:

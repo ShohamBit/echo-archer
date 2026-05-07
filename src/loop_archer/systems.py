@@ -8,6 +8,7 @@ from loop_archer.models import (
     Arrow,
     DeathReason,
     Enemy,
+    EnemyKind,
     GameMode,
     GameState,
     Pickup,
@@ -17,6 +18,22 @@ from loop_archer.models import (
     build_player_stats,
     clamp_to_arena,
 )
+
+
+def create_enemy(entity_id: int, kind: EnemyKind, position: Vec2) -> Enemy:
+    if kind is EnemyKind.FAST:
+        return Enemy(
+            id=entity_id,
+            position=position,
+            kind=kind,
+            hp=config.FAST_CHASER_HP,
+            speed=config.FAST_CHASER_SPEED,
+            damage=config.FAST_CHASER_DAMAGE,
+            reward=config.FAST_CHASER_REWARD,
+            radius=config.FAST_CHASER_RADIUS,
+        )
+
+    return Enemy(id=entity_id, position=position, kind=EnemyKind.CHASER)
 
 
 def begin_next_loop(state: GameState) -> None:
@@ -178,16 +195,20 @@ def _spawn_due_waves(state: GameState) -> None:
                 + state.current_loop * 0.41
             )
             position = Vec2.from_angle(angle) * (state.arena_radius - 8)
-            state.enemies.append(
-                Enemy(
-                    id=state.next_id(),
-                    position=position,
-                    speed=config.CHASER_SPEED + min(35, state.run_timer * 0.35),
-                )
-            )
+            kind = _enemy_kind_for_spawn(state.run_timer, index)
+            enemy = create_enemy(state.next_id(), kind, position)
+            if kind is EnemyKind.CHASER:
+                enemy.speed = config.CHASER_SPEED + min(35, state.run_timer * 0.35)
+            state.enemies.append(enemy)
         state.spawn_count += 1
         period = max(1.2, 4.2 - min(state.run_timer, 90) / 35)
         state.next_spawn_time += period
+
+
+def _enemy_kind_for_spawn(run_timer: float, spawn_index: int) -> EnemyKind:
+    if run_timer >= 18.0 and spawn_index % 4 == 0:
+        return EnemyKind.FAST
+    return EnemyKind.CHASER
 
 
 def _update_enemies(state: GameState, dt: float) -> None:
