@@ -37,3 +37,8 @@ Or, after the editable install:
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
 ```
+
+## Knowledge Base
+
+Project notes live in [docs/knowledge-base/index.md](docs/knowledge-base/index.md).
+Start there when adding a new feature after time away.
