@@ -6,6 +6,7 @@ from loop_archer import config
 from loop_archer.input import InputState
 from loop_archer.models import (
     Arrow,
+    DeathReason,
     Enemy,
     GameMode,
     GameState,
@@ -31,6 +32,7 @@ def begin_next_loop(state: GameState) -> None:
     state.spawn_count = 0
     state.run_shards = 0
     state.kills = 0
+    state.pending_death_reason = None
 
 
 def end_run(state: GameState) -> None:
@@ -45,6 +47,7 @@ def end_run(state: GameState) -> None:
         time_survived=state.run_timer,
         enemies_defeated=state.kills,
         shards_gained=gained,
+        death_reason=state.pending_death_reason or DeathReason.OVERWHELMED,
     )
     state.run_shards = 0
     state.mode = GameMode.DEAD_SUMMARY
@@ -58,8 +61,14 @@ def update_world(state: GameState, input_state: InputState, dt: float) -> None:
         return
 
     dt = min(max(dt, 0.0), 0.05)
+    previous_time = state.run_timer
     state.run_timer += dt
     _update_player(state, input_state, dt)
+    _apply_echo_decay(state, previous_time, state.run_timer)
+    if state.player.hp <= 0:
+        end_run(state)
+        return
+
     _shoot_if_ready(state, input_state)
     _spawn_due_waves(state)
     _update_enemies(state, dt)
@@ -69,6 +78,29 @@ def update_world(state: GameState, input_state: InputState, dt: float) -> None:
 
     if state.player.hp <= 0:
         end_run(state)
+
+
+def current_echo_decay_rate(run_timer: float) -> float:
+    if run_timer < config.ECHO_DECAY_GRACE_SECONDS:
+        return 0.0
+    ramp_time = max(0.0, run_timer - config.ECHO_DECAY_RAMP_START_SECONDS)
+    return config.BASE_ECHO_DECAY_PER_SECOND + (
+        ramp_time * config.ECHO_DECAY_RAMP_PER_SECOND
+    )
+
+
+def _apply_echo_decay(state: GameState, previous_time: float, current_time: float) -> None:
+    decay_start = config.ECHO_DECAY_GRACE_SECONDS
+    if current_time <= decay_start:
+        return
+
+    active_seconds = current_time - max(previous_time, decay_start)
+    if active_seconds <= 0:
+        return
+
+    state.player.hp -= current_echo_decay_rate(current_time) * active_seconds
+    if state.player.hp <= 0 and state.pending_death_reason is None:
+        state.pending_death_reason = DeathReason.ECHO_FADED
 
 
 def _update_player(state: GameState, input_state: InputState, dt: float) -> None:
@@ -141,6 +173,8 @@ def _update_enemies(state: GameState, dt: float) -> None:
         if enemy.position.distance_to(player.position) <= enemy.radius + player.radius:
             if player.invincibility_timer <= 0:
                 player.hp -= enemy.damage
+                if player.hp <= 0:
+                    state.pending_death_reason = DeathReason.OVERWHELMED
                 player.invincibility_timer = state.player_stats.invincibility_seconds
                 player.hit_flash_timer = 0.12
         survivors.append(enemy)

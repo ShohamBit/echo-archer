@@ -15,6 +15,11 @@ class GameMode(Enum):
     PAUSED = "paused"
 
 
+class DeathReason(Enum):
+    OVERWHELMED = "Overwhelmed"
+    ECHO_FADED = "Echo Faded"
+
+
 @dataclass(frozen=True)
 class Vec2:
     x: float = 0.0
@@ -62,7 +67,7 @@ class PlayerStats:
 @dataclass
 class Player:
     position: Vec2 = field(default_factory=Vec2)
-    hp: int = config.PLAYER_MAX_HP
+    hp: float = config.PLAYER_MAX_HP
     radius: float = config.PLAYER_RADIUS
     aim_direction: Vec2 = field(default_factory=lambda: Vec2(1, 0))
     shot_cooldown: float = 0.0
@@ -107,6 +112,7 @@ class RunSummary:
     time_survived: float = 0.0
     enemies_defeated: int = 0
     shards_gained: int = 0
+    death_reason: DeathReason | None = None
 
 
 @dataclass
@@ -137,6 +143,7 @@ class GameState:
     best_time: float = 0.0
     kills: int = 0
     last_run_summary: RunSummary = field(default_factory=RunSummary)
+    pending_death_reason: DeathReason | None = None
     next_entity_id: int = 1
 
     def next_id(self) -> int:

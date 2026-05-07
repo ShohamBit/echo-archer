@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from math import atan2, cos, sin
+from math import cos, sin
 
 import pygame
 
 from loop_archer import config
 from loop_archer.input import InputState
-from loop_archer.models import GameMode, GameState, Vec2
+from loop_archer.models import GameMode, Vec2
 from loop_archer.persistence import load_game, save_game
-from loop_archer.systems import begin_next_loop, update_world
+from loop_archer.systems import begin_next_loop, current_echo_decay_rate, update_world
 from loop_archer.upgrades import UPGRADE_DEFINITIONS, apply_upgrade
 
 
-SCREEN_CENTER = Vec2(config.WINDOW_WIDTH / 2, config.WINDOW_HEIGHT / 2)
 BG = (12, 14, 20)
 ARENA_FILL = (22, 26, 36)
 ARENA_LINE = (74, 93, 121)
@@ -55,24 +54,18 @@ class GameApp:
     def __init__(self) -> None:
         pygame.init()
         pygame.display.set_caption("Echo Archer")
-        self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+        self.fullscreen = True
+        self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
+        self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("consolas", 22)
         self.small_font = pygame.font.SysFont("consolas", 16)
         self.big_font = pygame.font.SysFont("consolas", 48, bold=True)
         self.state = load_game()
-        self.open_upgrades_button = Button(
-            pygame.Rect(config.WINDOW_WIDTH // 2 - 130, 462, 260, 48),
-            "Open Skill Tree",
-        )
-        self.restart_button = Button(
-            pygame.Rect(config.WINDOW_WIDTH // 2 - 100, 560, 200, 48),
-            "Start Loop",
-        )
-        self.buy_button = Button(
-            pygame.Rect(config.WINDOW_WIDTH // 2 - 105, 390, 210, 48),
-            "Buy Upgrade",
-        )
+        self.open_upgrades_button = Button(pygame.Rect(0, 0, 260, 48), "Open Skill Tree")
+        self.restart_button = Button(pygame.Rect(0, 0, 200, 48), "Start Loop")
+        self.buy_button = Button(pygame.Rect(0, 0, 210, 48), "Buy Upgrade")
+        self._layout_buttons()
 
     def run(self) -> None:
         running = True
@@ -83,8 +76,17 @@ class GameApp:
                 if event.type == pygame.QUIT:
                     save_game(self.state)
                     running = False
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+                    elif event.key == pygame.K_F11:
+                        self._toggle_fullscreen()
+                elif event.type == pygame.VIDEORESIZE and not self.fullscreen:
+                    self.windowed_size = event.size
+                    self.screen = pygame.display.set_mode(
+                        self.windowed_size, pygame.RESIZABLE
+                    )
+                    self._layout_buttons()
                 else:
                     self._handle_event(event)
 
@@ -119,12 +121,33 @@ class GameApp:
                 begin_next_loop(self.state)
                 save_game(self.state)
 
+    def _toggle_fullscreen(self) -> None:
+        self.fullscreen = not self.fullscreen
+        if self.fullscreen:
+            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        else:
+            self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+        self._layout_buttons()
+
+    def _layout_buttons(self) -> None:
+        width, height = self.screen.get_size()
+        cx = width // 2
+        cy = height // 2
+        self.open_upgrades_button.rect.center = (cx, cy + 112)
+        self.buy_button.rect.center = (cx, cy + 30)
+        self.restart_button.rect.center = (cx, cy + 200)
+
+    @property
+    def screen_center(self) -> Vec2:
+        width, height = self.screen.get_size()
+        return Vec2(width / 2, height / 2)
+
     def _world_to_screen(self, position: Vec2) -> tuple[int, int]:
-        screen = SCREEN_CENTER + position
+        screen = self.screen_center + position
         return int(screen.x), int(screen.y)
 
     def _screen_to_world(self, position: Vec2) -> Vec2:
-        return position - SCREEN_CENTER
+        return position - self.screen_center
 
     def _draw(self) -> None:
         self.screen.fill(BG)
@@ -196,41 +219,67 @@ class GameApp:
             pygame.draw.lines(self.screen, (45, 63, 92), False, points, 2)
 
     def _draw_hud(self) -> None:
+        width, _ = self.screen.get_size()
         hp_width = max(0, int(220 * self.state.player.hp / self.state.player_stats.max_hp))
         pygame.draw.rect(self.screen, (42, 46, 58), pygame.Rect(28, 26, 220, 18))
         pygame.draw.rect(self.screen, (214, 72, 88), pygame.Rect(28, 26, hp_width, 18))
+        self._text(
+            f"HP {max(0, int(self.state.player.hp))}/{self.state.player_stats.max_hp}",
+            256,
+            23,
+            self.small_font,
+            TEXT,
+        )
         self._text(f"Loop {self.state.current_loop:02d}", 28, 56, self.font)
-        self._text(f"{_format_time(self.state.run_timer)}", 590, 28, self.font)
+        self._center_text(f"{_format_time(self.state.run_timer)}", 34, self.font)
         self._text(f"Run shards {self.state.run_shards}", 28, 86, self.small_font, SHARD)
         self._text(f"Total shards {self.state.total_shards}", 28, 108, self.small_font, TEXT)
         self._text(f"Damage {self.state.player_stats.damage}", 28, 130, self.small_font, ARROW)
-        self._text(f"Best {_format_time(self.state.best_time)}", 1090, 28, self.small_font, MUTED)
+        decay_rate = current_echo_decay_rate(self.state.run_timer)
+        decay_label = (
+            "Echo Decay: Grace"
+            if decay_rate <= 0
+            else f"Echo Decay: -{decay_rate:.2f} HP/s"
+        )
+        self._text(decay_label, 28, 152, self.small_font, MUTED)
+        best = self.small_font.render(
+            f"Best {_format_time(self.state.best_time)}", True, MUTED
+        )
+        self.screen.blit(best, (width - best.get_width() - 28, 28))
 
     def _draw_death_summary(self) -> None:
-        self._draw_overlay_panel(380, 170, 520, 380)
+        width, height = self.screen.get_size()
+        self._draw_overlay_panel(width // 2 - 260, height // 2 - 190, 520, 380)
         summary = self.state.last_run_summary
-        self._center_text("LOOP FAILED", 230, self.big_font)
+        self._center_text("LOOP FAILED", height // 2 - 130, self.big_font)
+        reason = summary.death_reason.value if summary.death_reason else "Unknown"
+        self._center_text(reason, height // 2 - 74, self.font, MUTED)
         self._center_text(
-            f"Time survived: {_format_time(summary.time_survived)}", 312, self.font
+            f"Time survived: {_format_time(summary.time_survived)}",
+            height // 2 - 28,
+            self.font,
         )
-        self._center_text(f"Enemies defeated: {summary.enemies_defeated}", 344, self.font)
-        self._center_text(f"Shards gained: {summary.shards_gained}", 376, self.font, SHARD)
+        self._center_text(f"Enemies defeated: {summary.enemies_defeated}", height // 2 + 4, self.font)
+        self._center_text(f"Shards gained: {summary.shards_gained}", height // 2 + 36, self.font, SHARD)
         self.open_upgrades_button.draw(self.screen, self.font)
 
     def _draw_upgrade_screen(self) -> None:
-        self._draw_overlay_panel(330, 120, 620, 520)
-        self._center_text("SKILL TREE", 174, self.big_font)
-        self._center_text(f"Available shards: {self.state.total_shards}", 236, self.font, SHARD)
+        width, height = self.screen.get_size()
+        panel_x = width // 2 - 310
+        panel_y = height // 2 - 260
+        self._draw_overlay_panel(panel_x, panel_y, 620, 520)
+        self._center_text("SKILL TREE", panel_y + 54, self.big_font)
+        self._center_text(f"Available shards: {self.state.total_shards}", panel_y + 116, self.font, SHARD)
 
         upgrade = UPGRADE_DEFINITIONS["sharper_arrows_1"]
         owned = upgrade.id in self.state.owned_upgrades
-        card = pygame.Rect(config.WINDOW_WIDTH // 2 - 170, 286, 340, 86)
+        card = pygame.Rect(width // 2 - 170, panel_y + 166, 340, 86)
         pygame.draw.rect(self.screen, (31, 36, 48), card, border_radius=6)
         pygame.draw.rect(self.screen, (101, 128, 172), card, 2, border_radius=6)
-        self._center_text(upgrade.name, 308, self.font)
-        self._center_text("+20% arrow damage", 338, self.small_font, ARROW)
+        self._center_text(upgrade.name, panel_y + 188, self.font)
+        self._center_text("+20% arrow damage", panel_y + 218, self.small_font, ARROW)
         status = "Owned" if owned else f"Cost: {upgrade.cost} shards"
-        self._center_text(status, 360, self.small_font, MUTED)
+        self._center_text(status, panel_y + 240, self.small_font, MUTED)
 
         if owned or self.state.total_shards < upgrade.cost:
             pygame.draw.rect(self.screen, LOCKED, self.buy_button.rect, border_radius=6)
@@ -243,7 +292,8 @@ class GameApp:
         self.restart_button.draw(self.screen, self.font)
 
     def _draw_overlay_panel(self, x: int, y: int, w: int, h: int) -> None:
-        overlay = pygame.Surface((config.WINDOW_WIDTH, config.WINDOW_HEIGHT), pygame.SRCALPHA)
+        width, height = self.screen.get_size()
+        overlay = pygame.Surface((width, height), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 150))
         self.screen.blit(overlay, (0, 0))
         rect = pygame.Rect(x, y, w, h)
@@ -268,7 +318,8 @@ class GameApp:
         color: tuple[int, int, int] = TEXT,
     ) -> None:
         text = font.render(label, True, color)
-        self.screen.blit(text, text.get_rect(center=(config.WINDOW_WIDTH // 2, y)))
+        width, _ = self.screen.get_size()
+        self.screen.blit(text, text.get_rect(center=(width // 2, y)))
 
 
 def _format_time(seconds: float) -> str:

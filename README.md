@@ -22,7 +22,15 @@ Or, after the editable install:
 - WASD or arrow keys: move
 - Mouse: aim
 - Left mouse button: shoot
+- F11: toggle fullscreen
 - Esc: quit
+
+## Current POC Rules
+
+- Echo Archer starts fullscreen.
+- Your HP is also your loop timer: after the grace period, Echo Decay drains HP every second.
+- If enemies finish you, the run ends as `Overwhelmed`.
+- If Echo Decay drains the last HP, the run ends as `Echo Faded`.
 
 ## Test
 
