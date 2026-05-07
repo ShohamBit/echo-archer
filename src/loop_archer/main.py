@@ -6,7 +6,7 @@ import pygame
 
 from loop_archer import config
 from loop_archer.input import InputState
-from loop_archer.layout import arena_radius_for_screen
+from loop_archer.layout import arena_radius_for_screen, health_bar_rect_for_screen
 from loop_archer.models import GameMode, Vec2
 from loop_archer.persistence import load_game, save_game
 from loop_archer.systems import begin_next_loop, current_echo_decay_rate, update_world
@@ -254,33 +254,39 @@ class GameApp:
             pygame.draw.lines(self.screen, (45, 63, 92), False, points, 2)
 
     def _draw_hud(self) -> None:
-        width, _ = self.screen.get_size()
-        hp_width = max(0, int(220 * self.state.player.hp / self.state.player_stats.max_hp))
-        pygame.draw.rect(self.screen, (42, 46, 58), pygame.Rect(28, 26, 220, 18))
-        pygame.draw.rect(self.screen, (214, 72, 88), pygame.Rect(28, 26, hp_width, 18))
-        self._text(
-            f"HP {max(0, int(self.state.player.hp))}/{self.state.player_stats.max_hp}",
-            256,
-            23,
-            self.small_font,
-            TEXT,
-        )
-        self._text(f"Loop {self.state.current_loop:02d}", 28, 56, self.font)
+        width, height = self.screen.get_size()
+        self._draw_health_bar(width, height)
+        self._text(f"Loop {self.state.current_loop:02d}", 28, 26, self.font)
         self._center_text(f"{_format_time(self.state.run_timer)}", 34, self.font)
-        self._text(f"Run shards {self.state.run_shards}", 28, 86, self.small_font, SHARD)
-        self._text(f"Total shards {self.state.total_shards}", 28, 108, self.small_font, TEXT)
-        self._text(f"Damage {self.state.player_stats.damage}", 28, 130, self.small_font, ARROW)
+        self._text(f"Run shards {self.state.run_shards}", 28, 58, self.small_font, SHARD)
+        self._text(f"Total shards {self.state.total_shards}", 28, 80, self.small_font, TEXT)
+        self._text(f"Damage {self.state.player_stats.damage}", 28, 102, self.small_font, ARROW)
         decay_rate = current_echo_decay_rate(self.state.run_timer)
         decay_label = (
             "Echo Decay: Grace"
             if decay_rate <= 0
             else f"Echo Decay: -{decay_rate:.2f} HP/s"
         )
-        self._text(decay_label, 28, 152, self.small_font, MUTED)
+        self._text(decay_label, 28, 124, self.small_font, MUTED)
         best = self.small_font.render(
             f"Best {_format_time(self.state.best_time)}", True, MUTED
         )
         self.screen.blit(best, (width - best.get_width() - 28, 28))
+
+    def _draw_health_bar(self, width: int, height: int) -> None:
+        x, y, bar_width, bar_height = health_bar_rect_for_screen(width, height)
+        health_ratio = max(
+            0.0,
+            min(1.0, self.state.player.hp / self.state.player_stats.max_hp),
+        )
+        shell = pygame.Rect(x - 4, y - 4, bar_width + 8, bar_height + 8)
+        track = pygame.Rect(x, y, bar_width, bar_height)
+        fill = pygame.Rect(x, y, int(bar_width * health_ratio), bar_height)
+
+        pygame.draw.rect(self.screen, (14, 16, 22), shell, border_radius=8)
+        pygame.draw.rect(self.screen, (45, 48, 60), track, border_radius=6)
+        pygame.draw.rect(self.screen, (214, 72, 88), fill, border_radius=6)
+        pygame.draw.rect(self.screen, (238, 188, 164), shell, 2, border_radius=8)
 
     def _draw_death_summary(self) -> None:
         width, height = self.screen.get_size()
