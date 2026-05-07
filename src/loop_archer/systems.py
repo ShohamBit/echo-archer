@@ -111,7 +111,8 @@ def _update_player(state: GameState, input_state: InputState, dt: float) -> None
 
     move = input_state.move.normalized()
     player.position = clamp_to_arena(
-        player.position + move * state.player_stats.speed * dt
+        player.position + move * state.player_stats.speed * dt,
+        state.arena_radius,
     )
 
     aim = (input_state.aim_world - player.position).normalized()
@@ -149,7 +150,7 @@ def _spawn_due_waves(state: GameState) -> None:
                 + index * (2 * pi / wave_size)
                 + state.current_loop * 0.41
             )
-            position = Vec2.from_angle(angle) * (config.ARENA_RADIUS - 8)
+            position = Vec2.from_angle(angle) * (state.arena_radius - 8)
             state.enemies.append(
                 Enemy(
                     id=state.next_id(),
@@ -164,11 +165,15 @@ def _spawn_due_waves(state: GameState) -> None:
 
 def _update_enemies(state: GameState, dt: float) -> None:
     player = state.player
+    separation_offsets = _enemy_separation_offsets(state.enemies)
     survivors: list[Enemy] = []
     for enemy in state.enemies:
         enemy.hit_flash_timer = max(0.0, enemy.hit_flash_timer - dt)
         direction = (player.position - enemy.position).normalized()
-        enemy.position = enemy.position + direction * enemy.speed * dt
+        separation = separation_offsets.get(enemy.id, Vec2())
+        enemy.position = enemy.position + (
+            direction * enemy.speed + separation * config.ENEMY_SEPARATION_STRENGTH
+        ) * dt
 
         if enemy.position.distance_to(player.position) <= enemy.radius + player.radius:
             if player.invincibility_timer <= 0:
@@ -181,13 +186,33 @@ def _update_enemies(state: GameState, dt: float) -> None:
     state.enemies = survivors
 
 
+def _enemy_separation_offsets(enemies: list[Enemy]) -> dict[int, Vec2]:
+    offsets = {enemy.id: Vec2() for enemy in enemies}
+    for index, enemy in enumerate(enemies):
+        for other in enemies[index + 1 :]:
+            delta = enemy.position - other.position
+            distance = delta.length()
+            desired = enemy.radius + other.radius
+            if distance >= desired:
+                continue
+
+            direction = delta.normalized()
+            if direction.length() <= 0:
+                direction = Vec2(1, 0)
+            strength = (desired - distance) / desired
+            push = direction * strength
+            offsets[enemy.id] = offsets[enemy.id] + push
+            offsets[other.id] = offsets[other.id] - push
+    return offsets
+
+
 def _update_arrows(state: GameState, dt: float) -> None:
     remaining: list[Arrow] = []
     for arrow in state.arrows:
         distance = arrow.speed * dt
         arrow.position = arrow.position + arrow.direction * distance
         arrow.range_remaining -= distance
-        if arrow.range_remaining > 0 and arrow.position.length() <= config.ARENA_RADIUS + 80:
+        if arrow.range_remaining > 0 and arrow.position.length() <= state.arena_radius + 80:
             remaining.append(arrow)
     state.arrows = remaining
 

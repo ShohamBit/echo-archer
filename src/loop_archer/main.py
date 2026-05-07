@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from math import cos, sin
+from math import atan2, cos, sin
 
 import pygame
 
 from loop_archer import config
 from loop_archer.input import InputState
+from loop_archer.layout import arena_radius_for_screen
 from loop_archer.models import GameMode, Vec2
 from loop_archer.persistence import load_game, save_game
 from loop_archer.systems import begin_next_loop, current_echo_decay_rate, update_world
@@ -19,6 +20,7 @@ PLAYER = (245, 180, 82)
 PLAYER_HIT = (255, 245, 220)
 ENEMY = (208, 72, 78)
 ENEMY_HIT = (255, 170, 160)
+ENEMY_CORE = (102, 27, 37)
 ARROW = (246, 218, 128)
 SHARD = (103, 210, 255)
 TEXT = (229, 235, 244)
@@ -66,6 +68,7 @@ class GameApp:
         self.restart_button = Button(pygame.Rect(0, 0, 200, 48), "Start Loop")
         self.buy_button = Button(pygame.Rect(0, 0, 210, 48), "Buy Upgrade")
         self._layout_buttons()
+        self._sync_arena_radius()
 
     def run(self) -> None:
         running = True
@@ -87,6 +90,7 @@ class GameApp:
                         self.windowed_size, pygame.RESIZABLE
                     )
                     self._layout_buttons()
+                    self._sync_arena_radius()
                 else:
                     self._handle_event(event)
 
@@ -128,6 +132,7 @@ class GameApp:
         else:
             self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
         self._layout_buttons()
+        self._sync_arena_radius()
 
     def _layout_buttons(self) -> None:
         width, height = self.screen.get_size()
@@ -136,6 +141,10 @@ class GameApp:
         self.open_upgrades_button.rect.center = (cx, cy + 112)
         self.buy_button.rect.center = (cx, cy + 30)
         self.restart_button.rect.center = (cx, cy + 200)
+
+    def _sync_arena_radius(self) -> None:
+        width, height = self.screen.get_size()
+        self.state.arena_radius = arena_radius_for_screen(width, height)
 
     @property
     def screen_center(self) -> Vec2:
@@ -163,10 +172,11 @@ class GameApp:
 
     def _draw_playfield(self) -> None:
         center = self._world_to_screen(Vec2())
-        pygame.draw.circle(self.screen, ARENA_FILL, center, int(config.ARENA_RADIUS))
-        pygame.draw.circle(self.screen, ARENA_LINE, center, int(config.ARENA_RADIUS), 3)
-        pygame.draw.circle(self.screen, (36, 45, 61), center, 120, 1)
-        pygame.draw.circle(self.screen, (36, 45, 61), center, 220, 1)
+        arena_radius = int(self.state.arena_radius)
+        pygame.draw.circle(self.screen, ARENA_FILL, center, arena_radius)
+        pygame.draw.circle(self.screen, ARENA_LINE, center, arena_radius, 3)
+        pygame.draw.circle(self.screen, (36, 45, 61), center, int(arena_radius * 0.34), 1)
+        pygame.draw.circle(self.screen, (36, 45, 61), center, int(arena_radius * 0.62), 1)
 
         for pickup in self.state.pickups:
             pygame.draw.circle(
@@ -188,13 +198,7 @@ class GameApp:
             )
 
         for enemy in self.state.enemies:
-            color = ENEMY_HIT if enemy.hit_flash_timer > 0 else ENEMY
-            pygame.draw.circle(
-                self.screen,
-                color,
-                self._world_to_screen(enemy.position),
-                int(enemy.radius),
-            )
+            self._draw_chaser(enemy)
 
         color = PLAYER_HIT if self.state.player.hit_flash_timer > 0 else PLAYER
         player_pos = self._world_to_screen(self.state.player.position)
@@ -203,6 +207,37 @@ class GameApp:
         bow_tip = self.state.player.position + aim * 30
         pygame.draw.line(self.screen, ARROW, player_pos, self._world_to_screen(bow_tip), 4)
         self._draw_loop_glyph(center)
+
+    def _draw_chaser(self, enemy) -> None:
+        color = ENEMY_HIT if enemy.hit_flash_timer > 0 else ENEMY
+        to_player = (self.state.player.position - enemy.position).normalized()
+        if to_player.length() <= 0:
+            to_player = Vec2(1, 0)
+        angle = atan2(to_player.y, to_player.x)
+        radius = enemy.radius
+        tip = enemy.position + Vec2(cos(angle), sin(angle)) * (radius * 1.35)
+        left = enemy.position + Vec2(
+            cos(angle + 2.45), sin(angle + 2.45)
+        ) * radius
+        right = enemy.position + Vec2(
+            cos(angle - 2.45), sin(angle - 2.45)
+        ) * radius
+        points = [
+            self._world_to_screen(tip),
+            self._world_to_screen(left),
+            self._world_to_screen(right),
+        ]
+        pygame.draw.polygon(self.screen, color, points)
+        pygame.draw.polygon(self.screen, (110, 33, 45), points, 3)
+        core_center = self._world_to_screen(enemy.position)
+        pygame.draw.circle(self.screen, ENEMY_CORE, core_center, max(5, int(radius * 0.32)))
+        eye = enemy.position + to_player * (radius * 0.44)
+        pygame.draw.circle(
+            self.screen,
+            (255, 195, 158),
+            self._world_to_screen(eye),
+            max(3, int(radius * 0.14)),
+        )
 
     def _draw_loop_glyph(self, center: tuple[int, int]) -> None:
         radius = 54

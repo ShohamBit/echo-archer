@@ -129,6 +129,7 @@ class UpgradeDefinition:
 class GameState:
     current_loop: int = 1
     mode: GameMode = GameMode.PLAYING
+    arena_radius: float = config.ARENA_RADIUS
     player_stats: PlayerStats = field(default_factory=PlayerStats)
     player: Player = field(default_factory=Player)
     enemies: list[Enemy] = field(default_factory=list)
@@ -152,9 +153,9 @@ class GameState:
         return entity_id
 
 
-def clamp_to_arena(position: Vec2) -> Vec2:
+def clamp_to_arena(position: Vec2, arena_radius: float = config.ARENA_RADIUS) -> Vec2:
     distance = position.length()
-    max_distance = config.ARENA_RADIUS - config.PLAYER_RADIUS
+    max_distance = arena_radius - config.PLAYER_RADIUS
     if distance <= max_distance:
         return position
     return position.normalized() * max_distance
