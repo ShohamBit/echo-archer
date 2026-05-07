@@ -78,3 +78,81 @@ def test_quick_draw_increases_fire_rate():
     assert result.purchased is True
     assert state.total_shards == 0
     assert state.player_stats.fire_rate == 1.2
+
+
+def test_expanded_archer_upgrades_stack_into_late_damage_and_speed():
+    state = new_game_state(
+        total_shards=38,
+        owned_upgrades={"sharper_arrows_1", "sharper_arrows_2", "quick_draw_1"},
+    )
+
+    damage_result = apply_upgrade(state, "sharper_arrows_3")
+    speed_result = apply_upgrade(state, "quick_draw_2")
+    arrow_result = apply_upgrade(state, "swift_arrows")
+
+    assert damage_result.purchased is True
+    assert speed_result.purchased is True
+    assert arrow_result.purchased is True
+    assert state.total_shards == 0
+    assert state.player_stats.damage == 17
+    assert state.player_stats.fire_rate == 1.44
+    assert state.player_stats.arrow_speed == 864.0
+    assert state.player_stats.arrow_range == 598.0
+
+
+def test_piercing_shot_requires_first_damage_upgrade_and_adds_pierce():
+    locked_state = new_game_state(total_shards=18)
+
+    locked_result = apply_upgrade(locked_state, "piercing_shot")
+
+    assert locked_result.purchased is False
+    assert locked_result.reason == "Prerequisite locked"
+    assert locked_state.player_stats.pierce == 0
+
+    state = new_game_state(
+        total_shards=18,
+        owned_upgrades={"sharper_arrows_1"},
+    )
+
+    result = apply_upgrade(state, "piercing_shot")
+
+    assert result.purchased is True
+    assert state.player_stats.pierce == 1
+
+
+def test_expanded_survivor_upgrades_improve_survival_stats():
+    state = new_game_state(
+        total_shards=38,
+        owned_upgrades={"vital_echo"},
+    )
+
+    hp_result = apply_upgrade(state, "vital_echo_2")
+    speed_result = apply_upgrade(state, "light_feet")
+    dash_result = apply_upgrade(state, "shorter_dash_cooldown")
+
+    assert hp_result.purchased is True
+    assert speed_result.purchased is True
+    assert dash_result.purchased is True
+    assert state.total_shards == 0
+    assert state.player_stats.max_hp == 150
+    assert state.player_stats.speed == 297.0
+    assert state.player_stats.dash_cooldown == 1.875
+
+
+def test_expanded_echo_upgrades_reduce_decay_extend_pickup_and_boost_shards():
+    state = new_game_state(
+        total_shards=40,
+        owned_upgrades={"stable_echo"},
+    )
+
+    decay_result = apply_upgrade(state, "stable_echo_2")
+    magnet_result = apply_upgrade(state, "echo_magnet")
+    shard_result = apply_upgrade(state, "memory_of_battle")
+
+    assert decay_result.purchased is True
+    assert magnet_result.purchased is True
+    assert shard_result.purchased is True
+    assert state.total_shards == 0
+    assert state.player_stats.echo_decay_multiplier == 0.64
+    assert state.player_stats.pickup_radius == 63.0
+    assert state.player_stats.shard_gain_multiplier == 1.25

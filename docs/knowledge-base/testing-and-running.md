@@ -36,11 +36,12 @@ Current coverage focuses on:
 - death banking and loop reset
 - Echo Decay behavior and death reason
 - upgrade purchase validation and stat application
+- expanded upgrade stats such as pierce, arrow range, pickup radius, dash cooldown, and shard gain
 - persistence
 - enemy separation
 - enemy kind stats and wave mixing
 - dash movement, cooldown, aim fallback, and arena clamping
-- layout helpers for arena, HP bar, and dash indicator
+- layout helpers for arena, HP bar, dash indicator, and upgrade branch columns
 
 ## Pygame Smoke Checks
 

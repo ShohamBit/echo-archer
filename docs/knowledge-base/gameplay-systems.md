@@ -11,7 +11,10 @@ Current stats come from `config.py` plus owned permanent upgrades:
 - damage
 - fire rate
 - arrow speed
+- arrow range
+- pierce count
 - pickup radius
+- shard gain multiplier
 - invincibility seconds
 - Echo Decay multiplier
 - dash distance
@@ -46,6 +49,7 @@ Current arrow rules:
 - has finite range
 - damages enemies on circle collision
 - disappears on hit unless it has pierce remaining
+- uses upgraded arrow speed, range, damage, and pierce values from `PlayerStats`
 
 Projectile wrapping is not implemented yet. It is a good future upgrade hook.
 
@@ -102,6 +106,9 @@ Shard flow:
 
 Survival bonus is `int(run_timer // 10)`.
 
+`Memory of Battle` multiplies collected pickup value before it enters
+`run_shards`. Survival bonus is currently not multiplied.
+
 ## Upgrades
 
 Upgrade definitions live in `upgrades.py`.
@@ -110,9 +117,19 @@ Current upgrades:
 
 - `sharper_arrows_1`: `Sharper Arrows I`, costs 5 shards, multiplies damage by 1.2.
 - `sharper_arrows_2`: `Sharper Arrows II`, costs 10 shards, requires `Sharper Arrows I`, multiplies damage by 1.2.
-- `vital_echo`: `Vital Echo`, costs 8 shards, adds 25 max HP.
-- `stable_echo`: `Stable Echo`, costs 8 shards, reduces Echo Decay by 20%.
+- `sharper_arrows_3`: `Sharper Arrows III`, costs 18 shards, requires `Sharper Arrows II`, multiplies damage by 1.2.
 - `quick_draw_1`: `Quick Draw I`, costs 8 shards, increases fire rate by 20%.
+- `quick_draw_2`: `Quick Draw II`, costs 12 shards, requires `Quick Draw I`, increases fire rate by 20%.
+- `piercing_shot`: `Piercing Shot`, costs 18 shards, requires `Sharper Arrows I`, arrows can hit one extra enemy.
+- `swift_arrows`: `Swift Arrows`, costs 8 shards, increases arrow speed by 20% and arrow range by 15%.
+- `vital_echo`: `Vital Echo`, costs 8 shards, adds 25 max HP.
+- `vital_echo_2`: `Vital Echo II`, costs 16 shards, requires `Vital Echo`, adds 25 max HP.
+- `light_feet`: `Light Feet`, costs 10 shards, increases movement speed by 10%.
+- `shorter_dash_cooldown`: `Shorter Dash`, costs 12 shards, reduces dash cooldown by 25%.
+- `stable_echo`: `Stable Echo`, costs 8 shards, reduces Echo Decay by 20%.
+- `stable_echo_2`: `Stable Echo II`, costs 16 shards, requires `Stable Echo`, reduces Echo Decay by 20%.
+- `echo_magnet`: `Echo Magnet`, costs 10 shards, increases pickup radius by 50%.
+- `memory_of_battle`: `Memory of Battle`, costs 14 shards, increases collected pickup shard value by 25%.
 
 `build_player_stats()` reapplies owned upgrades from scratch. Keep this pattern
 when adding new permanent stat upgrades.

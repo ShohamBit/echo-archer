@@ -65,7 +65,10 @@ class PlayerStats:
     damage: int = config.BASE_DAMAGE
     fire_rate: float = config.BASE_FIRE_RATE
     arrow_speed: float = config.BASE_ARROW_SPEED
+    arrow_range: float = config.ARROW_RANGE
+    pierce: int = 0
     pickup_radius: float = config.INITIAL_PICKUP_RADIUS
+    shard_gain_multiplier: float = 1.0
     invincibility_seconds: float = config.PLAYER_INVINCIBILITY
     echo_decay_multiplier: float = 1.0
     dash_distance: float = config.DASH_DISTANCE
@@ -137,7 +140,14 @@ class UpgradeDefinition:
     damage_multiplier: float = 1.0
     max_hp_bonus: int = 0
     fire_rate_multiplier: float = 1.0
+    speed_multiplier: float = 1.0
+    arrow_speed_multiplier: float = 1.0
+    arrow_range_multiplier: float = 1.0
+    pickup_radius_multiplier: float = 1.0
+    shard_gain_multiplier: float = 1.0
     echo_decay_multiplier: float = 1.0
+    dash_cooldown_multiplier: float = 1.0
+    pierce_bonus: int = 0
 
 
 @dataclass
@@ -182,8 +192,15 @@ def build_player_stats(owned_upgrades: set[str] | None = None) -> PlayerStats:
     stats = PlayerStats()
     damage_multiplier = 1.0
     fire_rate_multiplier = 1.0
+    speed_multiplier = 1.0
+    arrow_speed_multiplier = 1.0
+    arrow_range_multiplier = 1.0
+    pickup_radius_multiplier = 1.0
+    shard_gain_multiplier = 1.0
     echo_decay_multiplier = 1.0
+    dash_cooldown_multiplier = 1.0
     max_hp_bonus = 0
+    pierce_bonus = 0
 
     for upgrade_id in sorted(owned_upgrades or set()):
         definition = UPGRADE_DEFINITIONS.get(upgrade_id)
@@ -191,16 +208,33 @@ def build_player_stats(owned_upgrades: set[str] | None = None) -> PlayerStats:
             continue
         damage_multiplier *= definition.damage_multiplier
         fire_rate_multiplier *= definition.fire_rate_multiplier
+        speed_multiplier *= definition.speed_multiplier
+        arrow_speed_multiplier *= definition.arrow_speed_multiplier
+        arrow_range_multiplier *= definition.arrow_range_multiplier
+        pickup_radius_multiplier *= definition.pickup_radius_multiplier
+        shard_gain_multiplier *= definition.shard_gain_multiplier
         echo_decay_multiplier *= definition.echo_decay_multiplier
+        dash_cooldown_multiplier *= definition.dash_cooldown_multiplier
         max_hp_bonus += definition.max_hp_bonus
+        pierce_bonus += definition.pierce_bonus
 
     stats.damage = round(stats.damage * damage_multiplier)
     stats.fire_rate = round(stats.fire_rate * fire_rate_multiplier, 3)
+    stats.speed = round(stats.speed * speed_multiplier, 3)
+    stats.arrow_speed = round(stats.arrow_speed * arrow_speed_multiplier, 3)
+    stats.arrow_range = round(stats.arrow_range * arrow_range_multiplier, 3)
+    stats.pickup_radius = round(stats.pickup_radius * pickup_radius_multiplier, 3)
+    stats.shard_gain_multiplier = round(
+        stats.shard_gain_multiplier * shard_gain_multiplier,
+        3,
+    )
     stats.echo_decay_multiplier = round(
         stats.echo_decay_multiplier * echo_decay_multiplier,
         3,
     )
+    stats.dash_cooldown = round(stats.dash_cooldown * dash_cooldown_multiplier, 3)
     stats.max_hp += max_hp_bonus
+    stats.pierce += pierce_bonus
     return stats
 
 

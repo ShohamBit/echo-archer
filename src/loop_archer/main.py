@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from math import atan2, cos, sin
 
 import pygame
@@ -36,6 +37,81 @@ PANEL = (22, 25, 34)
 BUTTON = (63, 93, 142)
 BUTTON_HOVER = (82, 121, 184)
 LOCKED = (59, 65, 78)
+UPGRADE_BRANCHES = ("Archer", "Survivor", "Echo")
+BRANCH_ACCENTS = {
+    "Archer": (246, 218, 128),
+    "Survivor": (118, 214, 168),
+    "Echo": (103, 210, 255),
+}
+
+
+@dataclass(frozen=True)
+class UpgradeScreenLayout:
+    panel_rect: pygame.Rect
+    restart_button_rect: pygame.Rect
+    branch_header_positions: dict[str, tuple[int, int]]
+    card_rects: dict[str, pygame.Rect]
+    compact_cards: bool
+
+
+def upgrade_screen_layout(
+    width: int,
+    height: int,
+    upgrades,
+) -> UpgradeScreenLayout:
+    margin_x = 24 if width < 1000 else 48
+    margin_y = 20 if height < 680 else 28
+    panel_width = min(width - margin_x * 2, 1140)
+    panel_height = min(height - margin_y * 2, 680)
+    panel_rect = pygame.Rect(
+        (width - panel_width) // 2,
+        (height - panel_height) // 2,
+        panel_width,
+        panel_height,
+    )
+    restart_button_rect = pygame.Rect(0, 0, 200, 48)
+    restart_button_rect.center = (width // 2, panel_rect.bottom - 36)
+
+    side_padding = 28 if width < 1000 else 40
+    column_gap = 14 if width < 1000 else 18
+    column_width = int(
+        (panel_rect.width - side_padding * 2 - column_gap * 2) / len(UPGRADE_BRANCHES)
+    )
+    branch_header_y = panel_rect.y + 112
+    card_start_y = panel_rect.y + 138
+    card_gap = 6 if height < 680 else 8
+
+    by_branch = {branch: [] for branch in UPGRADE_BRANCHES}
+    for upgrade in upgrades:
+        by_branch.setdefault(upgrade.branch, []).append(upgrade)
+    max_cards = max((len(items) for items in by_branch.values()), default=1)
+    available_height = restart_button_rect.top - 12 - card_start_y
+    card_height = int(
+        min(64, (available_height - card_gap * max(0, max_cards - 1)) / max_cards)
+    )
+    card_height = max(34, card_height)
+    compact_cards = card_height < 50
+
+    branch_header_positions: dict[str, tuple[int, int]] = {}
+    card_rects: dict[str, pygame.Rect] = {}
+    for column, branch in enumerate(UPGRADE_BRANCHES):
+        x = panel_rect.x + side_padding + column * (column_width + column_gap)
+        branch_header_positions[branch] = (x, branch_header_y)
+        for row, upgrade in enumerate(by_branch.get(branch, [])):
+            card_rects[upgrade.id] = pygame.Rect(
+                x,
+                card_start_y + row * (card_height + card_gap),
+                column_width,
+                card_height,
+            )
+
+    return UpgradeScreenLayout(
+        panel_rect=panel_rect,
+        restart_button_rect=restart_button_rect,
+        branch_header_positions=branch_header_positions,
+        card_rects=card_rects,
+        compact_cards=compact_cards,
+    )
 
 
 class Button:
@@ -69,6 +145,7 @@ class GameApp:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("consolas", 22)
         self.small_font = pygame.font.SysFont("consolas", 16)
+        self.tiny_font = pygame.font.SysFont("consolas", 13)
         self.big_font = pygame.font.SysFont("consolas", 48, bold=True)
         self.state = load_game()
         self.open_upgrades_button = Button(pygame.Rect(0, 0, 260, 48), "Open Skill Tree")
@@ -372,33 +449,38 @@ class GameApp:
 
     def _draw_upgrade_screen(self) -> None:
         width, height = self.screen.get_size()
-        panel_x = width // 2 - 310
-        panel_y = height // 2 - 260
-        self._draw_overlay_panel(panel_x, panel_y, 620, 520)
-        self._center_text("SKILL TREE", panel_y + 54, self.big_font)
-        self._center_text(f"Available shards: {self.state.total_shards}", panel_y + 116, self.font, SHARD)
+        layout = upgrade_screen_layout(width, height, UPGRADE_DEFINITIONS.values())
+        panel = layout.panel_rect
+        self._draw_overlay_panel(panel.x, panel.y, panel.width, panel.height)
+        self._center_text("SKILL TREE", panel.y + 38, self.big_font)
+        self._center_text(
+            f"Available shards: {self.state.total_shards}",
+            panel.y + 84,
+            self.font,
+            SHARD,
+        )
 
         self.upgrade_card_rects = {}
-        card_width = 250
-        card_height = 88
-        card_gap = 18
-        start_x = width // 2 - card_width - card_gap // 2
-        start_y = panel_y + 156
-        for index, upgrade in enumerate(UPGRADE_DEFINITIONS.values()):
-            column = index % 2
-            row = index // 2
-            rect = pygame.Rect(
-                start_x + column * (card_width + card_gap),
-                start_y + row * (card_height + card_gap),
-                card_width,
-                card_height,
-            )
-            self.upgrade_card_rects[upgrade.id] = rect
-            self._draw_upgrade_card(rect, upgrade)
+        for branch, position in layout.branch_header_positions.items():
+            accent = BRANCH_ACCENTS.get(branch, MUTED)
+            self._text(branch.upper(), position[0], position[1], self.small_font, accent)
+            underline = pygame.Rect(position[0], position[1] + 21, 56, 2)
+            pygame.draw.rect(self.screen, accent, underline, border_radius=1)
 
+        for upgrade in UPGRADE_DEFINITIONS.values():
+            rect = layout.card_rects[upgrade.id]
+            self.upgrade_card_rects[upgrade.id] = rect
+            self._draw_upgrade_card(rect, upgrade, layout.compact_cards)
+
+        self.restart_button.rect = layout.restart_button_rect
         self.restart_button.draw(self.screen, self.font)
 
-    def _draw_upgrade_card(self, rect: pygame.Rect, upgrade) -> None:
+    def _draw_upgrade_card(
+        self,
+        rect: pygame.Rect,
+        upgrade,
+        compact: bool = False,
+    ) -> None:
         owned = upgrade.id in self.state.owned_upgrades
         missing_prereq = any(
             item not in self.state.owned_upgrades for item in upgrade.prerequisites
@@ -421,10 +503,14 @@ class GameApp:
             border = (66, 72, 88)
 
         pygame.draw.rect(self.screen, fill, rect, border_radius=6)
-        pygame.draw.rect(self.screen, border, rect, 2, border_radius=6)
-        self._text(upgrade.branch, rect.x + 12, rect.y + 9, self.small_font, MUTED)
-        self._text(upgrade.name, rect.x + 12, rect.y + 30, self.small_font, TEXT)
-        self._text(upgrade.description, rect.x + 12, rect.y + 52, self.small_font, ARROW)
+        pygame.draw.rect(
+            self.screen,
+            BRANCH_ACCENTS.get(upgrade.branch, border),
+            pygame.Rect(rect.x, rect.y, 4, rect.height),
+            border_top_left_radius=6,
+            border_bottom_left_radius=6,
+        )
+        pygame.draw.rect(self.screen, border, rect, 1, border_radius=6)
 
         if owned:
             status = "Owned"
@@ -434,8 +520,46 @@ class GameApp:
             status = f"Buy: {upgrade.cost}"
         else:
             status = f"Need: {upgrade.cost}"
-        label = self.small_font.render(status, True, SHARD if can_buy else MUTED)
-        self.screen.blit(label, (rect.right - label.get_width() - 12, rect.y + 10))
+        status_color = SHARD if can_buy else MUTED
+
+        name_font = self.small_font if not compact else self.tiny_font
+        body_font = self.small_font if not compact else self.tiny_font
+        self._text_fit(
+            upgrade.name,
+            rect.x + 12,
+            rect.y + (7 if not compact else 5),
+            rect.width - 24,
+            name_font,
+            TEXT,
+        )
+
+        if compact:
+            self._text_fit(
+                status,
+                rect.x + 12,
+                rect.y + 22,
+                rect.width - 24,
+                body_font,
+                status_color,
+            )
+            return
+
+        self._text_fit(
+            upgrade.description,
+            rect.x + 12,
+            rect.y + 30,
+            rect.width - 24,
+            body_font,
+            ARROW,
+        )
+        self._text_fit(
+            status,
+            rect.x + 12,
+            rect.y + rect.height - 21,
+            rect.width - 24,
+            body_font,
+            status_color,
+        )
 
     def _draw_overlay_panel(self, x: int, y: int, w: int, h: int) -> None:
         width, height = self.screen.get_size()
@@ -455,6 +579,22 @@ class GameApp:
         color: tuple[int, int, int] = TEXT,
     ) -> None:
         self.screen.blit(font.render(label, True, color), (x, y))
+
+    def _text_fit(
+        self,
+        label: str,
+        x: int,
+        y: int,
+        max_width: int,
+        font: pygame.font.Font,
+        color: tuple[int, int, int] = TEXT,
+    ) -> None:
+        fitted = label
+        if font.size(fitted)[0] > max_width:
+            while fitted and font.size(f"{fitted}...")[0] > max_width:
+                fitted = fitted[:-1]
+            fitted = f"{fitted}..." if fitted else "..."
+        self._text(fitted, x, y, font, color)
 
     def _center_text(
         self,

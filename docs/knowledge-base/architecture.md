@@ -11,7 +11,7 @@ pygame rendering code so they can be tested without opening a window.
 - `src/loop_archer/upgrades.py`: upgrade definitions and purchase logic.
 - `src/loop_archer/persistence.py`: JSON save/load.
 - `src/loop_archer/layout.py`: screen-size layout helpers.
-- `src/loop_archer/main.py`: pygame app, input polling, rendering, screens, and buttons.
+- `src/loop_archer/main.py`: pygame app, input polling, rendering, screen-specific layouts, and buttons.
 - `src/loop_archer/config.py`: tuning constants.
 
 ## Data Flow
@@ -27,6 +27,11 @@ pygame rendering code so they can be tested without opening a window.
 
 `GameState` is the source of truth. Pygame surfaces, buttons, polygons, and draw
 positions are view-only. Do not put gameplay rules directly into draw methods.
+
+Reusable UI placement logic can live beside the screen that uses it when it is
+specific to that screen. For example, `upgrade_screen_layout()` is in `main.py`
+because it arranges upgrade cards and restart UI for that overlay, while generic
+HUD geometry remains in `layout.py`.
 
 ## Coordinate System
 

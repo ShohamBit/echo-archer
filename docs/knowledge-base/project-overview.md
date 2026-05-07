@@ -16,8 +16,8 @@ presentation.
 - The player moves with WASD or arrow keys, aims with the mouse, shoots with left mouse, and dashes with Space.
 - HP drains over time through Echo Decay, so HP is also the run timer pressure.
 - Enemies also damage the player on contact.
-- Death opens a run summary, then a skill-tree screen with multiple upgrade cards.
-- Permanent upgrades currently improve damage, max HP, fire rate, and Echo Decay.
+- Death opens a run summary, then a branch-column skill-tree screen.
+- Permanent upgrades currently improve damage, fire rate, pierce, arrow speed/range, max HP, movement, dash cooldown, pickup radius, shard gain, and Echo Decay.
 - Save data stores permanent shards, owned upgrades, best time, and loop count.
 
 ## Naming
@@ -32,6 +32,6 @@ own isolated refactor.
 
 Good next feature candidates:
 
-- Add a real skill-tree layout instead of one upgrade card.
 - Add projectile wrapping as an upgrade, not as a default rule.
 - Add settings, including an optional numeric HP display.
+- Add one more enemy type so the new upgrade power has more interesting targets.

@@ -74,3 +74,13 @@ Added the second enemy type:
 - mixed fast enemies into later waves
 - rendered fast enemies as magenta diamonds
 - added tests for fast enemy stats and wave mixing
+
+## feat: add upgrade expansion pack
+
+Expanded permanent progression again:
+
+- added Archer upgrades for third-tier damage, second-tier fire rate, piercing arrows, and faster/longer arrows
+- added Survivor upgrades for second-tier HP, movement speed, and shorter dash cooldown
+- added Echo upgrades for second-tier decay reduction, larger pickup radius, and increased pickup shard value
+- added arrow pierce/range and shard-gain stats to gameplay systems
+- changed the upgrade screen into tested Archer, Survivor, and Echo branch columns with compact small-screen cards

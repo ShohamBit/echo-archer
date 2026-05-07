@@ -72,10 +72,17 @@ The death summary is an overlay panel showing:
 - enemies defeated
 - shards gained
 
-The upgrade screen currently shows clickable upgrade cards. Cards display branch,
-name, description, and status:
+The upgrade screen uses `upgrade_screen_layout()` in `main.py` to place upgrade
+cards into three branch columns: Archer, Survivor, and Echo. The panel scales to
+the current screen size and switches to compact cards on smaller/windowed
+screens, so new upgrades stay visible and clear of the restart button.
+
+Normal cards display name, description, and status. Compact cards display name
+and status only. Status values are:
 
 - `Owned`
 - `Locked`
 - `Buy: <cost>`
 - `Need: <cost>`
+
+When adding a new upgrade branch, update `UPGRADE_BRANCHES` and the layout tests.

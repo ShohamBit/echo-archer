@@ -179,7 +179,8 @@ def _shoot_if_ready(state: GameState, input_state: InputState) -> None:
             direction=direction,
             damage=state.player_stats.damage,
             speed=state.player_stats.arrow_speed,
-            range_remaining=config.ARROW_RANGE,
+            range_remaining=state.player_stats.arrow_range,
+            pierce_remaining=state.player_stats.pierce,
         )
     )
     state.player.shot_cooldown = 1.0 / state.player_stats.fire_rate
@@ -308,7 +309,10 @@ def _collect_pickups(state: GameState, dt: float) -> None:
         to_player = state.player.position - pickup.position
         distance = to_player.length()
         if distance <= state.player.radius + pickup.radius:
-            state.run_shards += pickup.value
+            state.run_shards += max(
+                1,
+                round(pickup.value * state.player_stats.shard_gain_multiplier),
+            )
             continue
 
         if distance <= state.player_stats.pickup_radius and distance > 0:
