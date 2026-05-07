@@ -63,6 +63,8 @@ class PlayerStats:
     pickup_radius: float = config.INITIAL_PICKUP_RADIUS
     invincibility_seconds: float = config.PLAYER_INVINCIBILITY
     echo_decay_multiplier: float = 1.0
+    dash_distance: float = config.DASH_DISTANCE
+    dash_cooldown: float = config.DASH_COOLDOWN
 
 
 @dataclass
@@ -72,6 +74,8 @@ class Player:
     radius: float = config.PLAYER_RADIUS
     aim_direction: Vec2 = field(default_factory=lambda: Vec2(1, 0))
     shot_cooldown: float = 0.0
+    dash_cooldown_timer: float = 0.0
+    dash_flash_timer: float = 0.0
     invincibility_timer: float = 0.0
     hit_flash_timer: float = 0.0
 

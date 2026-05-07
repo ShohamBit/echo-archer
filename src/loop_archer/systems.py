@@ -111,8 +111,16 @@ def _apply_echo_decay(state: GameState, previous_time: float, current_time: floa
 def _update_player(state: GameState, input_state: InputState, dt: float) -> None:
     player = state.player
     player.shot_cooldown = max(0.0, player.shot_cooldown - dt)
+    player.dash_cooldown_timer = max(0.0, player.dash_cooldown_timer - dt)
+    player.dash_flash_timer = max(0.0, player.dash_flash_timer - dt)
     player.invincibility_timer = max(0.0, player.invincibility_timer - dt)
     player.hit_flash_timer = max(0.0, player.hit_flash_timer - dt)
+
+    aim = (input_state.aim_world - player.position).normalized()
+    if aim.length() > 0:
+        player.aim_direction = aim
+
+    _dash_if_ready(state, input_state)
 
     move = input_state.move.normalized()
     player.position = clamp_to_arena(
@@ -120,9 +128,23 @@ def _update_player(state: GameState, input_state: InputState, dt: float) -> None
         state.arena_radius,
     )
 
-    aim = (input_state.aim_world - player.position).normalized()
-    if aim.length() > 0:
-        player.aim_direction = aim
+
+def _dash_if_ready(state: GameState, input_state: InputState) -> None:
+    if not input_state.dash or state.player.dash_cooldown_timer > 0:
+        return
+
+    direction = input_state.move.normalized()
+    if direction.length() <= 0:
+        direction = state.player.aim_direction.normalized()
+    if direction.length() <= 0:
+        direction = Vec2(1, 0)
+
+    state.player.position = clamp_to_arena(
+        state.player.position + direction * state.player_stats.dash_distance,
+        state.arena_radius,
+    )
+    state.player.dash_cooldown_timer = state.player_stats.dash_cooldown
+    state.player.dash_flash_timer = 0.12
 
 
 def _shoot_if_ready(state: GameState, input_state: InputState) -> None:

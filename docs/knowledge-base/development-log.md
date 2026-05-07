@@ -54,3 +54,13 @@ Expanded permanent progression:
 - extended player stats for max HP, fire rate, and Echo Decay multiplier
 - updated the upgrade screen from one card to multiple clickable cards
 - added tests for upgrade effects, prerequisite locking, and Echo Decay scaling
+
+## feat: add dash ability
+
+Added a core movement verb:
+
+- `Space` dashes in movement direction, or aim direction when standing still
+- dash clamps to arena bounds
+- dash has a 2.5 second cooldown
+- HUD shows dash cooldown beside the health bar
+- added tests for dash movement, cooldown, aim fallback, and arena clamping

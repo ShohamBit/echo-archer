@@ -1,5 +1,9 @@
 from loop_archer import config
-from loop_archer.layout import arena_radius_for_screen, health_bar_rect_for_screen
+from loop_archer.layout import (
+    arena_radius_for_screen,
+    dash_indicator_rect_for_screen,
+    health_bar_rect_for_screen,
+)
 
 
 def test_arena_radius_uses_more_space_on_large_screens():
@@ -20,3 +24,13 @@ def test_health_bar_spans_middle_half_of_bottom_screen():
     assert width == 960
     assert height == 30
     assert y > 1080 - 90
+
+
+def test_dash_indicator_sits_near_bottom_health_bar():
+    health_x, health_y, health_width, _ = health_bar_rect_for_screen(1920, 1080)
+    dash_x, dash_y, dash_width, dash_height = dash_indicator_rect_for_screen(1920, 1080)
+
+    assert dash_width == 120
+    assert dash_height == 12
+    assert dash_x == health_x + health_width + 18
+    assert dash_y > health_y

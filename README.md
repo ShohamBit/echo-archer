@@ -22,6 +22,7 @@ Or, after the editable install:
 - WASD or arrow keys: move
 - Mouse: aim
 - Left mouse button: shoot
+- Space: dash
 - F11: toggle fullscreen
 - Esc: quit
 

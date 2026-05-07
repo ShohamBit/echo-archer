@@ -38,7 +38,8 @@ Current coverage focuses on:
 - upgrade purchase validation and stat application
 - persistence
 - enemy separation
-- layout helpers for arena and HP bar
+- dash movement, cooldown, aim fallback, and arena clamping
+- layout helpers for arena, HP bar, and dash indicator
 
 ## Pygame Smoke Checks
 

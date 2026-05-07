@@ -6,7 +6,11 @@ import pygame
 
 from loop_archer import config
 from loop_archer.input import InputState
-from loop_archer.layout import arena_radius_for_screen, health_bar_rect_for_screen
+from loop_archer.layout import (
+    arena_radius_for_screen,
+    dash_indicator_rect_for_screen,
+    health_bar_rect_for_screen,
+)
 from loop_archer.models import GameMode, Vec2
 from loop_archer.persistence import load_game, save_game
 from loop_archer.systems import begin_next_loop, current_echo_decay_rate, update_world
@@ -111,7 +115,8 @@ class GameApp:
         )
         mouse_world = self._screen_to_world(Vec2(*pygame.mouse.get_pos()))
         shoot = pygame.mouse.get_pressed(num_buttons=3)[0]
-        return InputState(move=move, aim_world=mouse_world, shoot=shoot)
+        dash = keys[pygame.K_SPACE]
+        return InputState(move=move, aim_world=mouse_world, shoot=shoot, dash=dash)
 
     def _handle_event(self, event: pygame.event.Event) -> None:
         if self.state.mode is GameMode.DEAD_SUMMARY:
@@ -202,7 +207,10 @@ class GameApp:
         for enemy in self.state.enemies:
             self._draw_chaser(enemy)
 
-        color = PLAYER_HIT if self.state.player.hit_flash_timer > 0 else PLAYER
+        color = PLAYER_HIT if (
+            self.state.player.hit_flash_timer > 0
+            or self.state.player.dash_flash_timer > 0
+        ) else PLAYER
         player_pos = self._world_to_screen(self.state.player.position)
         pygame.draw.circle(self.screen, color, player_pos, int(self.state.player.radius))
         aim = self.state.player.aim_direction
@@ -258,6 +266,7 @@ class GameApp:
     def _draw_hud(self) -> None:
         width, height = self.screen.get_size()
         self._draw_health_bar(width, height)
+        self._draw_dash_indicator(width, height)
         self._text(f"Loop {self.state.current_loop:02d}", 28, 26, self.font)
         self._center_text(f"{_format_time(self.state.run_timer)}", 34, self.font)
         self._text(f"Run shards {self.state.run_shards}", 28, 58, self.small_font, SHARD)
@@ -292,6 +301,28 @@ class GameApp:
         pygame.draw.rect(self.screen, (45, 48, 60), track, border_radius=6)
         pygame.draw.rect(self.screen, (214, 72, 88), fill, border_radius=6)
         pygame.draw.rect(self.screen, (238, 188, 164), shell, 2, border_radius=8)
+
+    def _draw_dash_indicator(self, width: int, height: int) -> None:
+        x, y, bar_width, bar_height = dash_indicator_rect_for_screen(width, height)
+        cooldown = self.state.player_stats.dash_cooldown
+        ready_ratio = 1.0
+        if cooldown > 0:
+            ready_ratio = 1.0 - (
+                self.state.player.dash_cooldown_timer / cooldown
+            )
+        ready_ratio = max(0.0, min(1.0, ready_ratio))
+
+        shell = pygame.Rect(x - 3, y - 3, bar_width + 6, bar_height + 6)
+        track = pygame.Rect(x, y, bar_width, bar_height)
+        fill = pygame.Rect(x, y, int(bar_width * ready_ratio), bar_height)
+        color = (111, 205, 255) if ready_ratio >= 1.0 else (74, 114, 153)
+
+        pygame.draw.rect(self.screen, (14, 16, 22), shell, border_radius=6)
+        pygame.draw.rect(self.screen, (45, 48, 60), track, border_radius=5)
+        pygame.draw.rect(self.screen, color, fill, border_radius=5)
+        pygame.draw.rect(self.screen, (146, 179, 212), shell, 1, border_radius=6)
+        label = self.small_font.render("Dash", True, MUTED)
+        self.screen.blit(label, (x, y - 22))
 
     def _draw_death_summary(self) -> None:
         width, height = self.screen.get_size()

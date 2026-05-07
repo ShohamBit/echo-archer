@@ -39,6 +39,7 @@ Bottom-center:
 
 - wide HP bar spanning the middle half of the screen
 - numeric HP is intentionally hidden for now
+- dash cooldown indicator beside the HP bar
 
 When settings are added later, numeric HP can become an optional setting.
 

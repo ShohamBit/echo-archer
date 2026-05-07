@@ -12,3 +12,11 @@ def health_bar_rect_for_screen(width: int, height: int) -> tuple[int, int, int, 
     x = int(width * 0.25)
     y = height - 58
     return x, y, bar_width, bar_height
+
+
+def dash_indicator_rect_for_screen(width: int, height: int) -> tuple[int, int, int, int]:
+    health_x, health_y, health_width, health_height = health_bar_rect_for_screen(
+        width,
+        height,
+    )
+    return health_x + health_width + 18, health_y + health_height - 12, 120, 12

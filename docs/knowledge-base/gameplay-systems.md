@@ -14,8 +14,26 @@ Current stats come from `config.py` plus owned permanent upgrades:
 - pickup radius
 - invincibility seconds
 - Echo Decay multiplier
+- dash distance
+- dash cooldown
 
 The player is clamped inside the arena with `clamp_to_arena(position, arena_radius)`.
+
+## Dash
+
+Dash is available by default on `Space`.
+
+Current dash rules:
+
+- dashes in the current movement direction
+- falls back to aim direction if the player is not moving
+- stays inside the arena boundary
+- uses `DASH_DISTANCE = 125.0`
+- uses `DASH_COOLDOWN = 2.5`
+- briefly flashes the player while dashing
+
+Future dash upgrades can reduce cooldown, increase distance, or add a damage
+trail.
 
 ## Shooting
 
