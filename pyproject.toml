@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "loop-archer-mvp"
+version = "0.1.0"
+description = "A Python pygame-ce death-loop archery survivor MVP."
+requires-python = ">=3.12"
+dependencies = [
+    "pygame-ce>=2.5,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+]
+
+[project.scripts]
+loop-archer = "loop_archer.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

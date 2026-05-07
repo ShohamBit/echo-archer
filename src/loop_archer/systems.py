@@ -1,0 +1,213 @@
+from __future__ import annotations
+
+from math import pi
+
+from loop_archer import config
+from loop_archer.input import InputState
+from loop_archer.models import (
+    Arrow,
+    Enemy,
+    GameMode,
+    GameState,
+    Pickup,
+    Player,
+    RunSummary,
+    Vec2,
+    build_player_stats,
+    clamp_to_arena,
+)
+
+
+def begin_next_loop(state: GameState) -> None:
+    state.current_loop += 1
+    state.mode = GameMode.PLAYING
+    state.player_stats = build_player_stats(state.owned_upgrades)
+    state.player = Player(hp=state.player_stats.max_hp)
+    state.enemies.clear()
+    state.arrows.clear()
+    state.pickups.clear()
+    state.run_timer = 0.0
+    state.next_spawn_time = 0.5
+    state.spawn_count = 0
+    state.run_shards = 0
+    state.kills = 0
+
+
+def end_run(state: GameState) -> None:
+    if state.mode is not GameMode.PLAYING:
+        return
+
+    survival_bonus = int(state.run_timer // 10)
+    gained = state.run_shards + survival_bonus
+    state.total_shards += gained
+    state.best_time = max(state.best_time, state.run_timer)
+    state.last_run_summary = RunSummary(
+        time_survived=state.run_timer,
+        enemies_defeated=state.kills,
+        shards_gained=gained,
+    )
+    state.run_shards = 0
+    state.mode = GameMode.DEAD_SUMMARY
+    state.enemies.clear()
+    state.arrows.clear()
+    state.pickups.clear()
+
+
+def update_world(state: GameState, input_state: InputState, dt: float) -> None:
+    if state.mode is not GameMode.PLAYING:
+        return
+
+    dt = min(max(dt, 0.0), 0.05)
+    state.run_timer += dt
+    _update_player(state, input_state, dt)
+    _shoot_if_ready(state, input_state)
+    _spawn_due_waves(state)
+    _update_enemies(state, dt)
+    _update_arrows(state, dt)
+    _resolve_arrow_hits(state)
+    _collect_pickups(state, dt)
+
+    if state.player.hp <= 0:
+        end_run(state)
+
+
+def _update_player(state: GameState, input_state: InputState, dt: float) -> None:
+    player = state.player
+    player.shot_cooldown = max(0.0, player.shot_cooldown - dt)
+    player.invincibility_timer = max(0.0, player.invincibility_timer - dt)
+    player.hit_flash_timer = max(0.0, player.hit_flash_timer - dt)
+
+    move = input_state.move.normalized()
+    player.position = clamp_to_arena(
+        player.position + move * state.player_stats.speed * dt
+    )
+
+    aim = (input_state.aim_world - player.position).normalized()
+    if aim.length() > 0:
+        player.aim_direction = aim
+
+
+def _shoot_if_ready(state: GameState, input_state: InputState) -> None:
+    if not input_state.shoot or state.player.shot_cooldown > 0:
+        return
+
+    direction = state.player.aim_direction.normalized()
+    if direction.length() <= 0:
+        direction = Vec2(1, 0)
+    spawn_position = state.player.position + direction * (state.player.radius + 8)
+    state.arrows.append(
+        Arrow(
+            id=state.next_id(),
+            position=spawn_position,
+            direction=direction,
+            damage=state.player_stats.damage,
+            speed=state.player_stats.arrow_speed,
+            range_remaining=config.ARROW_RANGE,
+        )
+    )
+    state.player.shot_cooldown = 1.0 / state.player_stats.fire_rate
+
+
+def _spawn_due_waves(state: GameState) -> None:
+    while state.run_timer >= state.next_spawn_time:
+        wave_size = min(8, 3 + int(state.run_timer // 18))
+        for index in range(wave_size):
+            angle = (
+                state.spawn_count * 1.37
+                + index * (2 * pi / wave_size)
+                + state.current_loop * 0.41
+            )
+            position = Vec2.from_angle(angle) * (config.ARENA_RADIUS - 8)
+            state.enemies.append(
+                Enemy(
+                    id=state.next_id(),
+                    position=position,
+                    speed=config.CHASER_SPEED + min(35, state.run_timer * 0.35),
+                )
+            )
+        state.spawn_count += 1
+        period = max(1.2, 4.2 - min(state.run_timer, 90) / 35)
+        state.next_spawn_time += period
+
+
+def _update_enemies(state: GameState, dt: float) -> None:
+    player = state.player
+    survivors: list[Enemy] = []
+    for enemy in state.enemies:
+        enemy.hit_flash_timer = max(0.0, enemy.hit_flash_timer - dt)
+        direction = (player.position - enemy.position).normalized()
+        enemy.position = enemy.position + direction * enemy.speed * dt
+
+        if enemy.position.distance_to(player.position) <= enemy.radius + player.radius:
+            if player.invincibility_timer <= 0:
+                player.hp -= enemy.damage
+                player.invincibility_timer = state.player_stats.invincibility_seconds
+                player.hit_flash_timer = 0.12
+        survivors.append(enemy)
+    state.enemies = survivors
+
+
+def _update_arrows(state: GameState, dt: float) -> None:
+    remaining: list[Arrow] = []
+    for arrow in state.arrows:
+        distance = arrow.speed * dt
+        arrow.position = arrow.position + arrow.direction * distance
+        arrow.range_remaining -= distance
+        if arrow.range_remaining > 0 and arrow.position.length() <= config.ARENA_RADIUS + 80:
+            remaining.append(arrow)
+    state.arrows = remaining
+
+
+def _resolve_arrow_hits(state: GameState) -> None:
+    arrows_left: list[Arrow] = []
+    dead_enemy_ids: set[int] = set()
+
+    for arrow in state.arrows:
+        consumed = False
+        for enemy in state.enemies:
+            if enemy.id in dead_enemy_ids:
+                continue
+            if arrow.position.distance_to(enemy.position) > arrow.radius + enemy.radius:
+                continue
+
+            enemy.hp -= arrow.damage
+            enemy.hit_flash_timer = 0.08
+            if enemy.hp <= 0:
+                dead_enemy_ids.add(enemy.id)
+                state.pickups.append(
+                    Pickup(id=state.next_id(), position=enemy.position, value=enemy.reward)
+                )
+                state.kills += 1
+
+            if arrow.pierce_remaining > 0:
+                arrow.pierce_remaining -= 1
+            else:
+                consumed = True
+                break
+
+        if not consumed:
+            arrows_left.append(arrow)
+
+    if dead_enemy_ids:
+        state.enemies = [
+            enemy for enemy in state.enemies if enemy.id not in dead_enemy_ids
+        ]
+    state.arrows = arrows_left
+
+
+def _collect_pickups(state: GameState, dt: float) -> None:
+    kept: list[Pickup] = []
+    for pickup in state.pickups:
+        to_player = state.player.position - pickup.position
+        distance = to_player.length()
+        if distance <= state.player.radius + pickup.radius:
+            state.run_shards += pickup.value
+            continue
+
+        if distance <= state.player_stats.pickup_radius and distance > 0:
+            pickup.position = (
+                pickup.position
+                + to_player.normalized() * config.PICKUP_MAGNET_SPEED * dt
+            )
+        kept.append(pickup)
+    state.pickups = kept
