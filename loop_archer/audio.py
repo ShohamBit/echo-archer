@@ -10,8 +10,13 @@ class Audio:
         self.enabled = True
         self.sounds = {}
         self.music_playing = False
+        self.music_paused = False
+        self.music_sound = None
+        self.music_channel = None
         try:
             pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=512)
+            pygame.mixer.set_reserved(1)
+            self.music_channel = pygame.mixer.Channel(0)
             for name, frequency, duration in (("shoot", 700, .08), ("recall", 350, .16),
                                                ("hit", 180, .045), ("kill", 500, .09),
                                                ("shield", 950, .2), ("death", 100, .5),
@@ -33,23 +38,30 @@ class Audio:
             self.sounds[name].play()
 
     def sync_music(self, battle, paused=False):
-        """One streamed loop; pause preserves the beat and M mutes music and cues."""
-        if not pygame.mixer.get_init():
+        """Reserved PCM loop; pause preserves the beat and M mutes all audio."""
+        if not pygame.mixer.get_init() or self.music_channel is None:
             return
         if not battle or not self.enabled:
             if self.music_playing:
-                pygame.mixer.music.stop()
+                self.music_channel.stop()
                 self.music_playing = False
+                self.music_paused = False
             return
         if not self.music_playing:
             try:
-                pygame.mixer.music.load(str(Path(__file__).resolve().parents[1] / "assets/boss_assault.wav"))
-                pygame.mixer.music.set_volume(.48)
-                pygame.mixer.music.play(-1, fade_ms=500)
+                if self.music_sound is None:
+                    self.music_sound = pygame.mixer.Sound(str(Path(__file__).resolve().parents[1] / "assets/boss_assault.wav"))
+                self.music_channel.set_volume(.48)
+                self.music_channel.play(self.music_sound, loops=-1, fade_ms=500)
                 self.music_playing = True
+                self.music_paused = False
             except (pygame.error, OSError):
                 return
-        if paused:
-            pygame.mixer.music.pause()
-        else:
-            pygame.mixer.music.unpause()
+        # The short PCM track avoids SDL_mixer's streaming-music resume deadlock.
+        # Change playback controls only on a state transition.
+        if paused != self.music_paused:
+            if paused:
+                self.music_channel.pause()
+            else:
+                self.music_channel.unpause()
+            self.music_paused = paused

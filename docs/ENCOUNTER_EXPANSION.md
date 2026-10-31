@@ -35,7 +35,7 @@ interesting ordinary enemies. Movement, bow timing and recall controls are retai
 
 ## Validation and limits
 
-83 automated tests cover previous mechanics plus loadout limits/roundtrips,
+85 automated tests cover previous mechanics plus loadout limits/roundtrips,
 legacy saves, actual multi-kill scoring, boss scheduling and damage windows,
 committed attack aiming, entrance/input freezes, practice save protection and
 music pause/resume/stop. No new runtime dependencies were added. Soundtrack
@@ -47,3 +47,21 @@ The 180-frame dummy-SDL boss/crowd benchmark measured 9.16ms mean rendering,
 This does not measure native fullscreen display latency or establish balance.
 Native fullscreen/audio feel and boss difficulty still need player acceptance.
 Staged review frames in `artifacts/expansion-*.png` use temporary profiles.
+
+## Tempest practice freeze correction
+
+The reported freeze was reproduced with boss music enabled. A captured stack
+showed the main thread blocked inside `pygame.mixer.music.unpause()`. Repeating
+the music synchronization with timed sound effects reproduced the same native
+mixer hang without any boss simulation or drawing. The cause was issuing resume
+on every frame even though playback was already active.
+
+The first transition-only fix still intermittently froze on a genuine resume in
+the pre-upload regression run. The short PCM track now plays from a cached Sound
+on reserved channel zero, avoiding streaming-music resume entirely. Sound effects
+use the other channels. Audio also tracks paused state and sends pause/resume only
+when it changes. Music, mute and scene transitions retain their existing behavior. Regressions verify
+control transitions and run the real mixer in a child process with a timeout so
+a recurrence cannot hang the test suite. The formerly freezing 2,400-frame Tempest
+scenario now completes spiral, blink and exposure cycles with music, shooting,
+recall and rendering. Saves and boss balance are unchanged.

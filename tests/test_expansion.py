@@ -190,18 +190,18 @@ class ExpansionAppTests(unittest.TestCase):
     def test_music_starts_pauses_resumes_and_stops_outside_battle(self):
         self.app.audio.enabled = True
         self.app.start(practice=True)
-        with patch("pygame.mixer.music.play") as play, patch("pygame.mixer.music.pause") as pause, patch("pygame.mixer.music.unpause") as resume, patch("pygame.mixer.music.stop") as stop:
+        with patch.object(self.app.audio, "music_channel") as channel:
             self.app.update(.1)
             self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
             self.app.update(.1)
             self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
             self.app.update(.1)
-            self.assertEqual(play.call_count, 1)
-            self.assertTrue(pause.called)
-            self.assertTrue(resume.called)
+            self.assertEqual(channel.play.call_count, 1)
+            self.assertTrue(channel.pause.called)
+            self.assertTrue(channel.unpause.called)
             self.app.action("menu")
             self.app.update(.1)
-            self.assertTrue(stop.called)
+            self.assertTrue(channel.stop.called)
 
 
 if __name__ == "__main__":

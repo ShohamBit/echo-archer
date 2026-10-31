@@ -7,6 +7,10 @@ single-volley/recall combat and permanent branching upgrades.
 The supplied Unreal installation stays untouched in `LOOP ARCHER/`.
 That installation is local only and is not included in this repository.
 
+This is the current game on the `loop-archer-current` branch. The earlier
+[Echo Archer MVP remains on main](https://github.com/ShohamBit/echo-archer/tree/main),
+preserving its original code, tests and development knowledge base.
+
 The combat foundation includes:
 one deployed arrow/volley until pickup, left/right portal wrapping, top/bottom
 ricochets, four charge levels, stepped arrow deceleration, and safe homing recall
