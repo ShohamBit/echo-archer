@@ -27,14 +27,14 @@ class VictoryRegressionTests(unittest.TestCase):
         run.wave_delay = 0
         run.update(.01)
         self.assertFalse(run.over)
-        self.assertTrue(any(enemy.kind == "boss" for enemy in run.enemies))
+        self.assertTrue(any(enemy.kind == "tempest" for enemy in run.enemies))
 
     def test_boss_must_be_killed_before_final_clear_wins(self):
         run = Run(Progress(), random.Random(6))
         run.wave = 8
         run.wave_delay = 0
         run.invulnerable = 100
-        boss = Enemy(1, Vector2(300, 100), "boss", hp=1, speed=0, radius=40)
+        boss = Enemy(1, Vector2(300, 100), "tempest", hp=1, speed=0, radius=40)
         run.enemies = [boss]
         run.update(.01)
         self.assertFalse(run.over)

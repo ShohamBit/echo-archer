@@ -9,13 +9,38 @@ import pygame
 
 
 class AppLifecycleTests(unittest.TestCase):
+    def test_both_boss_practices_end_after_actual_kill_and_can_retry_without_saving(self):
+        from loop_archer.model import Arrow
+        original = '{"version":1,"points":77}'
+        self.save_path.write_text(original)
+        for kind in ("boss", "tempest"):
+            with self.subTest(boss=kind):
+                self.app.practice_boss = kind
+                self.app.start(practice=True)
+                self.app.intro_remaining = 0
+                run = self.app.run
+                run.invulnerable = 100
+                enemy = run.enemies[0]
+                enemy.pos, enemy.hp = pygame.Vector2(700, 200), 1
+                enemy.warden.phase, enemy.warden.timer = "exposed", 2
+                enemy.warden.heading, enemy.warden.target = pygame.Vector2(1, 0), pygame.Vector2(1000, 200)
+                run.arrows = [Arrow(pygame.Vector2(450, 200), pygame.Vector2(5000, 0), 4)]
+                self.app.update(.05)
+                self.assertEqual(self.app.scene, "result")
+                self.assertTrue(run.victory)
+                self.assertFalse(run.enemies or run.spawn_queue)
+                self.app.render()
+                self.app.action("practice")
+                self.assertEqual(self.app.run.enemies[0].kind, kind)
+                self.assertEqual(self.save_path.read_text(), original)
+
     def test_boss_practice_does_not_bank_after_returning_to_menu(self):
         saved = '{"version":1,"points":77}'
         self.save_path.write_text(saved)
         original = self.app.progress.points
         loops = self.app.progress.loops
         self.app.start(practice=True)
-        self.assertEqual(self.app.run.wave, 8)
+        self.assertEqual(self.app.run.wave, 4)
         self.app.run.points = 100
         self.app.action("menu")
         self.app.action("quit")
@@ -63,6 +88,7 @@ class AppLifecycleTests(unittest.TestCase):
 
     def test_pause_freezes_timer_and_cancels_incomplete_draw(self):
         self.app.start()
+        self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
         self.app.run.begin_charge()
         self.app.run.charge = 0.2
         self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
@@ -89,6 +115,7 @@ class AppLifecycleTests(unittest.TestCase):
         from pygame import Vector2 as Vec
         from loop_archer.model import Arrow
         self.app.start()
+        self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
         arrow = Arrow(self.app.run.player + Vec(600, 0), Vec(), 1, state="stuck")
         self.app.run.arrows = [arrow]
         self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE))
@@ -104,6 +131,7 @@ class AppLifecycleTests(unittest.TestCase):
         from pygame import Vector2 as Vec
         from loop_archer.model import Arrow
         self.app.start()
+        self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
         arrow = Arrow(self.app.run.player + Vec(600, 0), Vec(), 1, state="stuck")
         self.app.run.arrows = [arrow]
         self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE))

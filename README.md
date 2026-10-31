@@ -63,6 +63,7 @@ supplied local copy; ordinary play and tests do not.
 | Hold left mouse, then release | Draw and shoot one volley; all arrows pierce |
 | Hold right mouse or Space | Recall stopped arrows safely toward your live position |
 | Escape | Pause/resume; back to menu outside combat |
+| Enter during an arrival | Skip the player or boss entrance |
 | M | Toggle sound |
 | F11 | Toggle fullscreen |
 | F5 / F6 / F7 | Toggle shake / flashes / arrow trails |
@@ -92,7 +93,7 @@ Progress is shared across modes. Shields protect against hits, not the timer.
 The archer now has a nearby bow-state badge, four charge dots and audio cues for
 full charge, recall availability and pickup. Movement and shot timing are unchanged.
 
-The final boss, **the Warden**, alternates a telegraphed five-shot fan and a
+The wave-four boss, **the Warden**, alternates a telegraphed five-shot fan and a
 marked charging lane. After charging, its rear core opens briefly. Hit that core
 from behind, using positioning, portals or recall. Armor blocks other hits.
 The core takes triple arrow damage, limited to 12 damage per opening against
@@ -101,14 +102,18 @@ The core takes triple arrow damage, limited to 12 damage per opening against
 a faster nine-shot fan, quicker transitions and a radial burst after recovery.
 Boss entry restores at least 30 seconds; successful core hits restore 3 seconds.
 
-**The Tempest** appears at Campaign wave four. Its three rotating bullet streams
+**The Tempest** is the Campaign wave-eight finale. Its three rotating bullet streams
 give way to a marked teleport, an outward burst and a brief vulnerable eye.
 It has 32 health with an eight-damage cap per opening. At half health it fires
-more frequently and its opening shortens. Killing it does not finish the campaign.
+more frequently and its opening shortens. Defeating it clears the campaign.
 
 Both bosses enter through an animated gate with a title sequence. Combat and the
 clock freeze during the entrance; Enter skips it. An original 150 BPM synth/drum
 track plays during the encounters, pauses with the game and follows M mute.
+Normal runs also begin with a short, skippable player arrival. Entry animations
+pause with the game, and shooting/recall controls resume after arrival. Bosses
+land away from the player and cannot move, shoot or deal contact damage before
+their entrance begins.
 
 Regular enemies now have animated mantis, scarab and horned-caster silhouettes.
 Hunters telegraph a committed lunge; plated guards flank and rush; casters strafe,
@@ -129,6 +134,13 @@ Select the **Boss: Warden / Tempest** button beside **Boss Practice** to choose
 an encounter, then enter practice with your equipped upgrades. Practice does not
 bank points or write your save. CLI: `main.py --boss-practice --boss tempest`.
 See [the expansion playtest checklist](docs/ENCOUNTER_EXPANSION.md).
+
+The campaign now introduces hunters, guards and casters across three authored
+encounters before the Warden, then rebuilds pressure toward Tempest. Packs arrive
+with deliberate gaps. A two-second regroup freezes the clock after a wave clears,
+allowing arrow retrieval and preparation. Soft crowd spacing keeps ordinary
+enemies readable while preserving committed attacks. Boss Practice ends cleanly
+on the selected boss's defeat. See [the campaign playtest](docs/CAMPAIGN_PLAYTEST.md).
 
 ## Upgrade loadouts
 
@@ -160,6 +172,7 @@ An abrupt process termination during combat does not preserve unbanked points.
 | --- | --- |
 | `loop_archer/model.py` | Combat, enemies, arrows, recall, timer, wave generation and boss |
 | `loop_archer/boss.py` | Warden attack phases, locked telegraphs and rear-core vulnerability |
+| `loop_archer/campaign.py` | Eight authored encounters, goals and pack rhythm |
 | `loop_archer/enemy_ai.py` | Hunter lunges, guard flanking/rushes, caster strafing and gold fleeing |
 | `loop_archer/creatures.py` | Animated vector enemy silhouettes and attack telegraphs |
 | `analysis/compose_boss_music.py` | Reproducible original boss soundtrack composition; standard library only |

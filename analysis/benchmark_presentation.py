@@ -23,6 +23,7 @@ def measure(frames=60, boss=False):
         app.save_allowed = False
         app.progress = Progress(levels={k: u.max_level for k, u in BY_KEY.items()})
         app.start()
+        app.entry_remaining = 0
         app.run.invulnerable = 1000
         app.run.time_left = 1000
         app.run.enemies = [Enemy(i, pygame.Vector2(150 + (i % 6) * 250, 180 + (i // 6) * 260)) for i in range(24)]

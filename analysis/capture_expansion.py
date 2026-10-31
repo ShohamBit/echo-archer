@@ -38,6 +38,7 @@ with tempfile.TemporaryDirectory() as directory:
     app.render()
     pygame.image.save(app.canvas, str(output / "expansion-tempest-blink.png"))
     app.start()
+    app.entry_remaining = 0
     app.run.invulnerable = 0
     app.run.wave, app.run.time_left, app.run.max_time = 5, 25, 25
     app.run.player = pygame.Vector2(840, 1050)

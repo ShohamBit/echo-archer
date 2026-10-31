@@ -14,6 +14,7 @@ from .audio import Audio
 from .model import HEIGHT, WIDTH, PLAYER_RADIUS, Run, bank_run
 from .progression import Progress, UPGRADES, load_progress, save_progress
 from .creatures import draw_creature
+from .campaign import CAMPAIGN, boss_wave
 from .shop import SkillTree
 from .presentation import Presentation
 
@@ -68,6 +69,7 @@ class App:
         self.windowed_size = (1152, 720)
         self.practice_boss = "boss"
         self.intro_remaining = 0.0
+        self.entry_remaining = 0.0
         self.intro_boss = None
         self.seen_bosses = set()
         self.mouse = (-100, -100)
@@ -103,15 +105,18 @@ class App:
         self.shop.release()
         self.shop.dragging = False
         self.run = Run(self.progress, self.rng, self.endless, original=self.original_mode)
+        self.run.defer_boss_arrivals = True
         self.practice = practice
         self.run_practice = practice
         self.intro_remaining = 0
+        self.entry_remaining = 0 if practice else 1.0
         self.intro_boss = None
         self.seen_bosses.clear()
         if practice:
             self.run.original = False
             self.run.endless = False
-            self.run.wave = 8 if self.practice_boss == "boss" else 4
+            self.run.wave = boss_wave(self.practice_boss)
+            self.run.practice_boss_kind = self.practice_boss
             self.run.wave_delay = 0
             self.run.spawn(self.practice_boss)
             self.begin_boss_intro(self.run.enemies[-1])
@@ -124,7 +129,25 @@ class App:
         self.seen_bosses.add(enemy.id)
         self.intro_boss = enemy
         self.intro_remaining = 3.2
+        self.run.boss_arrival_pending = False
+        if enemy.kind == "boss":
+            delta = self.run.player - enemy.pos
+            enemy.warden.heading = delta.normalize() if delta else pygame.Vector2(0, 1)
+            enemy.warden.target = pygame.Vector2(self.run.player)
         self.cancel_input()
+
+    @property
+    def entrance_active(self):
+        return self.entry_remaining > 0 or self.intro_remaining > 0
+
+    def arrival_gate(self, position, radius, progress, color):
+        """A local landing gate; no full-frame shader or offscreen teleport."""
+        for ring in range(3):
+            width = radius * (1.3 + ring * .25) * (.3 + .7 * min(1, progress * 4))
+            height = width * .32
+            ink = tuple(round(BG[i] + (color[i] - BG[i]) * (1 - progress * .65)) for i in range(3))
+            pygame.draw.ellipse(self.canvas, ink,
+                                (position.x - width, position.y - height, width * 2, height * 2), 2)
 
     def draw_loadout(self):
         self.header("UPGRADE LOADOUT")
@@ -289,6 +312,11 @@ class App:
         for bullet in run.bullets:
             pygame.draw.circle(self.canvas, RED, point(bullet.pos), max(6, 14 * scale))
         p = point(run.player)
+        if self.entry_remaining > 0:
+            progress = 1 - self.entry_remaining
+            self.arrival_gate(p, 70, progress, CYAN)
+            p.y -= self.entry_remaining ** 2 * 45
+            scale *= .35 + .65 * (progress * progress * (3 - 2 * progress))
         if not self.presentation.flashes or run.invulnerable <= 0 or int(run.elapsed * 12) % 2 == 0:
             self.diamond(p + (0, 8), 80 * scale, (9, 9, 12))
             self.diamond(p, 80 * scale, WHITE)
@@ -314,6 +342,8 @@ class App:
         state = run.bow_state
         label = {"ready": "READY", "charging": f"DRAW {run.charge_level}/4", "flying": "IN FLIGHT",
                  "recallable": "RECALL READY", "returning": "RETURNING"}[state]
+        if self.entrance_active:
+            label = "ARRIVING"
         color = GOLD if state in ("charging", "recallable") else CYAN if state in ("ready", "returning") else MUTED
         badge = pygame.Rect(0, 0, 162, 30)
         badge.center = (max(ARENA.left + 85, min(ARENA.right - 85, p.x)), max(155, min(690, p.y + 72)))
@@ -325,7 +355,7 @@ class App:
                 pygame.draw.circle(self.canvas, GOLD if i < run.charge_level else LINE,
                                    (badge.centerx - 24 + i * 16, badge.bottom + 9), 4)
         self.canvas.blit(self.vignette, ARENA)
-        if ARENA.collidepoint(self.mouse):
+        if not self.entrance_active and ARENA.collidepoint(self.mouse):
             mx, my = self.mouse
             for dx, dy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
                 pygame.draw.line(self.canvas, WHITE, (mx + dx * 8, my + dy * 8), (mx + dx * 17, my + dy * 17), 3)
@@ -334,24 +364,24 @@ class App:
     def draw_warden(self, enemy, point, scale):
         warden = enemy.warden
         p, radius = point(enemy.pos), enemy.radius * scale
-        if self.intro_remaining > 0 and self.intro_boss is enemy:
-            arrival = max(0, min(1, (3.2 - self.intro_remaining) / 1.8))
-            p.y -= (1 - arrival) ** 2 * 440
-            radius *= .45 + .55 * arrival
-            for ring in range(3):
-                pygame.draw.ellipse(self.canvas, (135, 101, 189),
-                                    (p.x-radius*(1.3+ring*.3), p.y-radius*.4-ring*9,
-                                     radius*(2.6+ring*.6), radius*.8+ring*18), 2)
+        arriving = self.intro_remaining > 0 and self.intro_boss is enemy
+        progress = 1 - self.intro_remaining / 3.2 if arriving else 1
+        if arriving:
+            self.arrival_gate(p, radius, progress, RED if enemy.kind == "boss" else (189, 144, 252))
+            arrival = max(0, min(1, (3.2 - self.intro_remaining - .25) / 1.65))
+            arrival = arrival * arrival * (3 - 2 * arrival)
+            p.y -= (1 - arrival) * 35
+            radius *= .15 + .85 * arrival
         if enemy.kind == "tempest":
             violet = (189, 144, 252)
-            if warden.phase == "blink" and warden.target is not None:
+            if not arriving and warden.phase == "blink" and warden.target is not None:
                 destination = point(warden.target)
                 pygame.draw.circle(self.canvas, violet, destination, radius + 18, 2)
                 pygame.draw.line(self.canvas, violet, destination - (18, 0), destination + (18, 0), 2)
                 pygame.draw.line(self.canvas, violet, destination - (0, 18), destination + (0, 18), 2)
             # Six revolving blades surround an eye, rather than Warden armor.
             for i in range(6):
-                direction = pygame.Vector2(1, 0).rotate(warden.angle + i * 60)
+                direction = pygame.Vector2(1, 0).rotate(warden.angle + i * 60 + (progress * 360 if arriving else 0))
                 side = direction.rotate(90)
                 points = [p + direction * radius * .55, p + direction * radius * 1.12 + side * radius * .25,
                           p + direction * radius * 1.25, p + direction * radius * .7 - side * radius * .18]
@@ -363,13 +393,13 @@ class App:
             return
         direction = warden.heading
         side = direction.rotate(90)
-        if warden.phase == "dash_windup":
+        if not arriving and warden.phase == "dash_windup":
             end = point(enemy.pos + direction * 800)
             polygon = [p + side * radius, end + side * radius, end - side * radius, p - side * radius]
             pygame.draw.polygon(self.canvas, (53, 34, 45), polygon)
             pygame.draw.aalines(self.canvas, RED, True, polygon)
             pygame.draw.aaline(self.canvas, GOLD, p, end)
-        elif warden.phase == "fan_windup":
+        elif not arriving and warden.phase == "fan_windup":
             for angle in (-24, -12, 0, 12, 24):
                 ray = direction.rotate(angle)
                 pygame.draw.aaline(self.canvas, (155, 91, 82), p + ray * radius,
@@ -401,21 +431,35 @@ class App:
         self.text("LOOP", 28, 65, 28, MUTED)
         self.text("ARCHER", 28, 102, 28, CYAN)
         self.text("WAVE", 28, 200, 20, MUTED)
-        wave = f"{run.wave:02} / 08" if self.practice or not self.endless and not self.original_mode else f"{run.wave:02}"
+        wave_number = max(1, run.wave)
+        wave = f"{wave_number:02} / 08" if self.practice or not self.endless and not self.original_mode else f"{wave_number:02}"
         self.text(wave, 28, 235, 32, WHITE)
         self.text("POINTS", 28, 310, 20, MUTED)
         self.hud_text(run.points, 28, 350, 48, GOLD)
         self.text(f"{run.kills} kills", 28, 426, 22, MUTED)
         self.text(f"{run.shields} shields", 28, 463, 22, CYAN)
         self.text(f"{len(run.enemies) + len(run.spawn_queue)} enemies {'active' if run.original else 'left'}", 28, 501, 18, MUTED)
-        self.wrapped("Defeat the final boss to clear the campaign." if self.practice or not self.endless and not self.original_mode else "Survive. There is no automatic finish.", 28, 525, 190, 18, MUTED)
+        objective = run.encounter.goal if run.encounter else "Survive. There is no automatic finish."
+        if run.wave == 0 and not run.original and not run.endless:
+            objective = CAMPAIGN[0].goal
+        self.wrapped(objective, 28, 535, 190, 18, MUTED)
         boss = next((e for e in run.enemies if e.warden), None)
         if boss and self.intro_remaining <= 0:
             self.text(boss.warden.NAME + (" / ENRAGED" if boss.warden.enraged else ""), ARENA.centerx, 108, 24, RED, True)
             pygame.draw.rect(self.canvas, (54, 31, 43), (ARENA.centerx - 180, 132, 360, 8), border_radius=4)
             pygame.draw.rect(self.canvas, RED, (ARENA.centerx - 180, 132, 360 * max(0, min(1, boss.hp / boss.warden.MAX_HEALTH)), 8), border_radius=4)
             self.text(boss.warden.hint, ARENA.centerx, 165, 18, CYAN if boss.warden.exposed else GOLD, True)
-        status = run.bow_hint
+        elif run.encounter and not self.intro_remaining:
+            self.text(run.encounter.title, ARENA.centerx, 110, 24, WHITE, True)
+            if run.spawn_queue:
+                self.text(f"{len(run.spawn_queue)} reinforcements queued", ARENA.centerx, 145, 18, MUTED, True)
+        if run.intermission > 0:
+            following = CAMPAIGN[run.wave].title if run.wave < len(CAMPAIGN) and not run.endless else f"WAVE {run.wave + 1:02}"
+            pygame.draw.rect(self.canvas, PANEL, (310, 230, 660, 165), border_radius=14)
+            self.text(f"WAVE {run.wave:02} CLEARED", ARENA.centerx, 259, 24, CYAN, True)
+            self.text("NEXT: " + following, ARENA.centerx, 310, 32, WHITE, True)
+            self.text(f"Regroup / clock frozen / {run.intermission:.1f}s", ARENA.centerx, 359, 20, MUTED, True)
+        status = "Arrival / combat and clock paused" if self.entrance_active else run.bow_hint
         self.text(status, ARENA.centerx, 754, 22, (180, 180, 186), True)
         if run.feedback_time > 0:
             self.text(run.feedback, ARENA.centerx, 708, 18, GOLD, True)
@@ -434,11 +478,17 @@ class App:
     def draw_boss_intro(self):
         boss = self.intro_boss
         # A local gate and title card; the arena stays visible throughout arrival.
-        pygame.draw.rect(self.canvas, BG, (ARENA.left, 570, ARENA.width, 175))
+        pygame.draw.rect(self.canvas, PANEL, (280, 570, 720, 165), border_radius=14)
         self.text("AN INTRUDER ENTERS THE LOOP", 640, 599, 20, GOLD, True)
         self.text(boss.warden.NAME, 640, 641, 40, RED if boss.kind == "boss" else (189, 144, 252), True)
         self.text("Break the armor. Survive the charge." if boss.kind == "boss" else "Escape the spiral. Punish the blink.", 640, 686, 22, WHITE, True)
         self.text("ENTER TO SKIP", 640, 725, 18, MUTED, True)
+
+    def draw_player_entry(self):
+        pygame.draw.rect(self.canvas, PANEL, (320, 570, 640, 140), border_radius=14)
+        self.text("ENTER THE ARENA", 640, 610, 32, CYAN, True)
+        self.text("Draw. Release. Recall.", 640, 652, 22, WHITE, True)
+        self.text("ENTER TO SKIP", 640, 687, 18, MUTED, True)
 
     def draw_tree(self):
         self.shop.draw(self)
@@ -465,13 +515,15 @@ class App:
             self.draw_play()
             if self.intro_remaining > 0 and self.scene == "play":
                 self.draw_boss_intro()
+            elif self.entry_remaining > 0 and self.scene == "play":
+                self.draw_player_entry()
             if self.scene == "pause":
                 self.overlay("PAUSED", "Take a breath. Your timer is frozen.")
                 self.button("RESUME   /   ESC", (420, 379, 440, 52), "resume", accent=True)
                 self.button("END RUN & BANK POINTS", (420, 447, 440, 52), "retire")
                 self.button("SAVE & QUIT", (420, 515, 440, 52), "quit")
             elif self.scene == "result":
-                self.overlay("LOOP BREACHED" if self.run.victory else "THE LOOP CONTINUES", self.run.reason)
+                self.overlay("PRACTICE CLEARED" if self.practice and self.run.victory else "LOOP BREACHED" if self.run.victory else "THE LOOP CONTINUES", self.run.reason)
                 self.text(f"+{self.run.points} POINTS   /   {self.run.kills} KILLS   /   WAVE {self.run.wave}", 640, 369, 24, GOLD, True)
                 self.text(f"Skillshots +{self.run.skillshot_bonus}   /   Multi-kills +{self.run.multikill_bonus}   /   Best burst {self.run.best_multikill}", 640, 399, 18, MUTED, True)
                 self.button("PRACTICE AGAIN" if self.practice else "SPEND POINTS   /   SPACE", (420, 432, 440, 56), "practice" if self.practice else "tree", accent=True)
@@ -591,8 +643,9 @@ class App:
                 self.shop.reset_camera()
             elif event.key == pygame.K_m:
                 self.audio.enabled = not self.audio.enabled
-            elif event.key == pygame.K_RETURN and self.scene == "play" and self.intro_remaining > 0:
+            elif event.key == pygame.K_RETURN and self.scene == "play" and self.entrance_active:
                 self.intro_remaining = 0
+                self.entry_remaining = 0
             elif event.key == pygame.K_ESCAPE:
                 if self.scene == "play":
                     self.cancel_input()
@@ -606,7 +659,7 @@ class App:
                     self.scene = "menu"
             elif event.key == pygame.K_SPACE:
                 if self.scene == "play":
-                    if self.intro_remaining <= 0:
+                    if not self.entrance_active:
                         self.recall_keys.add("space")
                         self.run.recall()
                 elif self.scene in ("menu", "tree"):
@@ -627,7 +680,9 @@ class App:
                 self.shop.release()
             elif self.scene == "tree" and event.button == 1 and self.shop.hit(self.mouse, self.progress):
                 self.shop.begin(self.mouse, self.progress)
-            elif self.scene == "play" and self.intro_remaining <= 0:
+            elif self.scene == "play":
+                if self.entrance_active:
+                    return
                 if event.button == 1 and ARENA.collidepoint(self.mouse):
                     self.run.begin_charge()
                 elif event.button == 3:
@@ -672,6 +727,13 @@ class App:
                 self.audio.play("buy")
                 self.persist()
         if self.scene == "play":
+            if self.run.over:
+                self.bank()
+                self.scene = "result"
+                return
+            if self.entry_remaining > 0:
+                self.entry_remaining = max(0, self.entry_remaining - dt)
+                return
             if self.intro_remaining > 0:
                 self.intro_remaining = max(0, self.intro_remaining - dt)
                 return

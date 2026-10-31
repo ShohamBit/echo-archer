@@ -68,16 +68,16 @@ class ExpansionModelTests(unittest.TestCase):
         self.assertEqual(run.multikill_count, 1)
         self.assertEqual(run.multikill_bonus, 5)
 
-    def test_tempest_midpoint_does_not_replace_final_warden(self):
+    def test_warden_midpoint_and_tempest_finale_follow_playtested_difficulty(self):
         run = Run(Progress())
         run.wave = 3
         run.start_wave()
-        self.assertEqual(run.spawn_queue, ["tempest"])
-        run.spawn("tempest")
+        self.assertEqual(run.spawn_queue, ["boss"])
+        run.spawn("boss")
         self.assertFalse(run.boss_defeated)
         run.wave = 7
         run.start_wave()
-        self.assertEqual(run.spawn_queue, ["boss"])
+        self.assertEqual(run.spawn_queue, ["tempest"])
 
     def test_tempest_locks_blink_then_opens_eye_with_bounded_damage(self):
         boss, pos, player = Tempest(), Vec(840, 400), Vec(1000, 1000)
@@ -132,6 +132,61 @@ class ExpansionModelTests(unittest.TestCase):
 
 
 class ExpansionAppTests(unittest.TestCase):
+    def test_player_arrival_freezes_clock_and_inputs_then_skips_cleanly(self):
+        self.app.start()
+        run = self.app.run
+        clock, position = run.time_left, Vec(run.player)
+        self.app.handle(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(700, 400)))
+        self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE))
+        self.app.update(.5)
+        self.assertEqual(run.time_left, clock)
+        self.assertEqual(run.player, position)
+        self.assertFalse(run.charging or run.enemies or self.app.recall_keys)
+        self.app.render()
+        self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        self.app.update(.1)
+        self.assertFalse(self.app.entrance_active)
+        self.assertLess(run.time_left, clock)
+
+    def test_player_arrival_completes_naturally_and_freezes_while_paused(self):
+        self.app.start()
+        self.app.update(.2)
+        self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        remaining = self.app.entry_remaining
+        self.app.update(.5)
+        self.assertEqual(self.app.entry_remaining, remaining)
+        self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.app.update(remaining)
+        self.assertFalse(self.app.entrance_active)
+        self.assertEqual(self.app.run.elapsed, 0)
+        self.app.update(.05)
+        self.assertGreater(self.app.run.elapsed, 0)
+
+    def test_entrance_click_cannot_activate_stale_menu_buttons(self):
+        self.app.render()
+        self.app.start(practice=True)
+        run = self.app.run
+        self.app.handle(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=(100, 450)))
+        self.assertIs(self.app.run, run)
+        self.assertTrue(self.app.practice)
+        self.assertTrue(self.app.entrance_active)
+
+    def test_campaign_boss_entrance_stops_combat_before_contact_or_projectiles(self):
+        self.app.start()
+        self.app.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        run = self.app.run
+        run.wave, run.wave_delay = 7, 0
+        run.invulnerable = 0
+        run.player = Vec(840, 504)
+        self.app.update(.05)
+        self.assertFalse(run.over)
+        self.assertEqual(self.app.scene, "play")
+        self.assertGreater(self.app.intro_remaining, 0)
+        self.assertFalse(run.bullets)
+        boss = run.enemies[0]
+        self.assertGreater(boss.pos.distance_to(run.player), boss.radius + 60)
+        self.assertEqual(boss.warden.timer, 3.2, "AI must not run before the entrance")
+
     def setUp(self):
         self.env = patch.dict(os.environ, {"SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy"})
         self.env.start()

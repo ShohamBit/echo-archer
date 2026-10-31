@@ -2,6 +2,44 @@
 from pygame import Vector2 as Vec
 
 
+def separate_enemies(enemies, dt, bounds=(1680, 1680)):
+    """Soft local spacing; committed attacks and bosses keep their positions.
+
+    A spatial grid avoids checking every pair across the entire arena.
+    """
+    bodies = [enemy for enemy in enemies if not enemy.warden]
+    grid, offsets = {}, {enemy.id: Vec() for enemy in bodies}
+    cell_size = max((enemy.radius * 2 for enemy in bodies), default=200)
+    for enemy in bodies:
+        cell = (int(enemy.pos.x // cell_size), int(enemy.pos.y // cell_size))
+        grid.setdefault(cell, []).append(enemy)
+    for enemy in bodies:
+        cell = (int(enemy.pos.x // cell_size), int(enemy.pos.y // cell_size))
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for other in grid.get((cell[0] + dx, cell[1] + dy), ()):
+                    if other.id <= enemy.id:
+                        continue
+                    delta = enemy.pos - other.pos
+                    desired = (enemy.radius + other.radius) * .9
+                    distance = delta.length()
+                    if distance >= desired:
+                        continue
+                    direction = delta / distance if distance else Vec(1, 0).rotate((enemy.id * 73 + other.id * 31) % 360)
+                    push = direction * ((desired - distance) / desired) * 160
+                    offsets[enemy.id] += push
+                    offsets[other.id] -= push
+    for enemy in bodies:
+        if enemy.phase not in ("hunt", "recover"):
+            continue
+        push = offsets[enemy.id]
+        if push.length_squared() > 180 ** 2:
+            push.scale_to_length(180)
+        enemy.pos += push * dt
+        enemy.pos.x = max(enemy.radius, min(bounds[0] - enemy.radius, enemy.pos.x))
+        enemy.pos.y = max(enemy.radius, min(bounds[1] - enemy.radius, enemy.pos.y))
+
+
 def update_enemy(enemy, player, dt):
     """Move in-place and return projectile velocities; no rendering dependencies."""
     delta = player - enemy.pos

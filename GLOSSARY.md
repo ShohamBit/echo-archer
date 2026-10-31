@@ -16,6 +16,16 @@ and returning to combat.
 **Recall**:
 Pulling a stopped arrow toward the archer while the recall control is held.
 
+**Encounter**:
+A named campaign wave with an enemy composition, tactical goal and spawn rhythm.
+
+**Pack**:
+A small group of reinforcements separated from the next group by a longer gap.
+
+**Regroup**:
+The two-second break after a cleared wave. The clock and passive income freeze
+while movement and arrow retrieval remain available.
+
 **Portal wrap**:
 An arrow crossing a horizontal arena boundary and reappearing on the other side
 without reversing direction.

@@ -23,7 +23,7 @@ interesting ordinary enemies. Movement, bow timing and recall controls are retai
    streams. Leave the violet blink marker, dodge the outward burst, then hit the
    exposed eye. Blink destination locks before teleporting. The eye is vulnerable
    from any direction, with an eight-damage budget per opening and 32 total health.
-6. Play Campaign: Tempest is wave four, Warden is wave eight. The midboss must not
+6. Play Campaign: Warden is wave four, Tempest is wave eight. The midboss must not
    grant campaign victory. Both restore at least 30 seconds on entry. Practice
    never banks combat points or records.
 7. In ordinary combat, compare lunging mantis hunters, flanking/rushing armored
@@ -35,7 +35,7 @@ interesting ordinary enemies. Movement, bow timing and recall controls are retai
 
 ## Validation and limits
 
-85 automated tests cover previous mechanics plus loadout limits/roundtrips,
+The expansion's initial 85 automated tests cover previous mechanics plus loadout limits/roundtrips,
 legacy saves, actual multi-kill scoring, boss scheduling and damage windows,
 committed attack aiming, entrance/input freezes, practice save protection and
 music pause/resume/stop. No new runtime dependencies were added. Soundtrack
@@ -47,6 +47,7 @@ The 180-frame dummy-SDL boss/crowd benchmark measured 9.16ms mean rendering,
 This does not measure native fullscreen display latency or establish balance.
 Native fullscreen/audio feel and boss difficulty still need player acceptance.
 Staged review frames in `artifacts/expansion-*.png` use temporary profiles.
+The later campaign slice and current validation are in `CAMPAIGN_PLAYTEST.md`.
 
 ## Tempest practice freeze correction
 

@@ -10,7 +10,8 @@ import random
 from pygame import Vector2 as Vec
 from .progression import Progress
 from .boss import Warden, Tempest
-from .enemy_ai import update_enemy
+from .enemy_ai import update_enemy, separate_enemies
+from .campaign import CAMPAIGN, FINAL_BOSS
 
 WIDTH, HEIGHT = 1680, 1680
 PLAYER_RADIUS = 60
@@ -111,6 +112,13 @@ class Run:
         self.wave_delay = 0.7
         self.spawn_queue: list[str] = []
         self.spawn_timer = 0.0
+        self.spawned_in_wave = 0
+        self.wave_kills = 0
+        self.intermission = 0.0
+        self.practice_boss_kind = None
+        self.practice_completed = False
+        self.defer_boss_arrivals = False
+        self.boss_arrival_pending = False
         self.next_id = 0
         self.over = False
         self.victory = False
@@ -142,6 +150,10 @@ class Run:
 
     def level(self, key: str) -> int:
         return self.levels.get(key, 0)
+
+    @property
+    def encounter(self):
+        return CAMPAIGN[self.wave - 1] if not self.original and not self.endless and 1 <= self.wave <= len(CAMPAIGN) else None
 
     @property
     def charge_duration(self) -> float:
@@ -230,7 +242,7 @@ class Run:
         self.burst(self.player, (226, 244, 243), 35)
 
     def hurt(self, reason: str):
-        if self.invulnerable > 0 or self.over:
+        if self.invulnerable > 0 or self.over or self.intermission > 0:
             return
         self.shake = 10
         if self.shields:
@@ -266,6 +278,11 @@ class Run:
         elif kind in ("boss", "tempest"):
             hp, radius, speed = (Warden.MAX_HEALTH if kind == "boss" else Tempest.MAX_HEALTH), 140, 0
             pos = Vec(WIDTH / 2, HEIGHT * .30)
+            if pos.distance_to(self.player) < radius + PLAYER_RADIUS + 80:
+                landings = [Vec(x, y) for x in (WIDTH * .25, WIDTH * .75)
+                            for y in (HEIGHT * .25, HEIGHT * .75)]
+                pos = max(landings, key=lambda landing: landing.distance_squared_to(self.player))
+            self.boss_arrival_pending = self.defer_boss_arrivals
             self.max_time = max(30, self.max_time)
             self.time_left = self.max_time
             self.bullets.clear()
@@ -275,36 +292,42 @@ class Run:
 
     def start_wave(self):
         self.wave += 1
-        if self.wave == 8 and not self.endless:
-            # Let the finale teach its own pattern without unrelated shooters
-            # obscuring the telegraphs and rear-core opportunity.
-            self.spawn_queue = ["boss"]
-        elif self.wave == 4 and not self.endless:
-            self.spawn_queue = ["tempest"]
+        self.spawned_in_wave, self.wave_kills = 0, 0
+        self.intermission = 0
+        if self.encounter:
+            self.spawn_queue = list(self.encounter.enemies)
+            if not self.encounter.boss:
+                extras = self.encounter.enemies
+                self.spawn_queue.extend(extras[i % len(extras)] for i in range(self.level("more_enemies")))
         else:
             self.spawn_queue = ["shooter" if self.wave >= 3 and i % 5 == 4 else
                                 "tank" if self.wave >= 2 and i % 4 == 3 else "chaser"
                                 for i in range(4 + self.wave * 2 + self.level("more_enemies"))]
-            for i, kind in enumerate(self.spawn_queue):
-                if kind == "chaser" and self.rng.random() < .025 * self.level("nugget"):
-                    self.spawn_queue[i] = "nugget"
-        self.banner = "THE LOOP / FINAL WAVE" if self.wave == 8 and not self.endless else f"WAVE {self.wave:02}"
+        for i, kind in enumerate(self.spawn_queue):
+            if kind == "chaser" and self.rng.random() < .025 * self.level("nugget"):
+                self.spawn_queue[i] = "nugget"
+        self.banner = self.encounter.title if self.encounter else f"WAVE {self.wave:02}"
         self.banner_time = 1.8
         self.spawn_timer = 0
 
     def update(self, dt: float, movement=(0, 0), aim=None):
-        if dt <= 0 or self.over:
+        if dt <= 0 or self.over or self.boss_arrival_pending:
             return
         # Bounded substeps keep wall and collision behavior stable during frame stalls.
         remaining = min(dt, 0.25)
         while remaining > 1e-8 and not self.over:
             step = min(remaining, 1 / 120)
             self._step(step, movement, aim)
+            if self.boss_arrival_pending:
+                break
             remaining -= step
 
     def _step(self, dt, movement, aim):
         self.elapsed += dt
-        self.time_left -= dt
+        recovering = self.intermission > 0
+        self.intermission = max(0, self.intermission - dt)
+        if not recovering:
+            self.time_left -= dt
         self.invulnerable = max(0, self.invulnerable - dt)
         self.shake = max(0, self.shake - dt * 32)
         self.banner_time = max(0, self.banner_time - dt)
@@ -337,30 +360,38 @@ class Run:
                 self.events.append("charged")
             if self.charge >= 4:
                 self.release()
-        self.passive_clock += dt
+        self.passive_clock += 0 if recovering else dt
         if self.passive_clock >= 3:
             self.passive_clock -= 3
             self.points += self.level("passive")
         if self.original:
             self._original_spawning(dt)
         elif not self.enemies and not self.spawn_queue:
-            self.wave_delay -= dt
-            if self.wave_delay <= 0:
+            if not recovering:
+                self.wave_delay -= dt
+            if recovering and self.intermission == 0:
+                self.start_wave()
+            elif not recovering and self.wave_delay <= 0:
                 if self.wave >= 8 and not self.endless:
                     if self.boss_defeated:
                         self.points += 30
                         self.finish("Final encounter cleared", True)
                         return
                     # Even an unusual empty final-wave state cannot bypass the boss.
-                    self.spawn("boss")
+                    self.spawn(FINAL_BOSS)
                 else:
                     self.start_wave()
         if self.spawn_queue:
             self.spawn_timer -= dt
             if self.spawn_timer <= 0:
                 self.spawn(self.spawn_queue.pop(0))
-                self.spawn_timer = 0.25
+                self.spawned_in_wave += 1
+                plan = self.encounter
+                self.spawn_timer = (plan.pack_pause if self.spawned_in_wave % plan.pack_size == 0 else plan.cadence) if plan else .25
                 self.wave_delay = 1.3
+        if self.boss_arrival_pending:
+            return
+        separate_enemies(self.enemies, dt, (WIDTH, HEIGHT))
         for enemy in self.enemies:
             enemy.flash = max(0, enemy.flash - dt)
             if enemy.warden:
@@ -381,6 +412,15 @@ class Run:
             elif not (-20 < bullet.pos.x < WIDTH + 20 and -20 < bullet.pos.y < HEIGHT + 20):
                 self.bullets.remove(bullet)
         self._arrows(dt)
+        if self.practice_completed:
+            self.finish("Boss practice cleared", True)
+        elif not self.original and not self.over and self.wave > 0 and not self.enemies and not self.spawn_queue and self.wave_kills and self.intermission == 0:
+            if not self.endless and self.wave == len(CAMPAIGN) and self.boss_defeated:
+                self.points += 30
+                self.finish("Final encounter cleared", True)
+            else:
+                self.intermission = 2.0
+                self.bullets.clear()
         state = self.bow_state
         if state != self.last_bow_state and state in ("ready", "recallable"):
             self.events.append("ready" if state == "ready" else "recallable")
@@ -443,6 +483,11 @@ class Run:
             for enemy in candidates:
                 if enemy.id in hit_set or not segment_hits(old, arrow.pos, enemy.pos, enemy.radius + ARROW_RADIUS):
                     continue
+                if enemy.kind == "tempest" and enemy.warden.exposed:
+                    # The open eye sits inside the blade ring. Let the arrow
+                    # traverse that ring before evaluating the smaller core hit.
+                    if not segment_hits(old, arrow.pos, enemy.pos, 55 + ARROW_RADIUS):
+                        continue
                 hit_set.add(enemy.id)
                 damage = (1 + self.level("recall")) if returning else arrow.damage + (self.level("bounce") if arrow.bounces else 0)
                 if enemy.warden:
@@ -466,8 +511,11 @@ class Run:
                 self.events.append("hit")
                 if enemy.hp <= 0:
                     self.enemies.remove(enemy)
-                    if enemy.kind == "boss":
+                    if enemy.kind == FINAL_BOSS and self.wave == len(CAMPAIGN):
                         self.boss_defeated = True
+                    if enemy.warden and enemy.kind == self.practice_boss_kind:
+                        self.practice_completed = True
+                    self.wave_kills += 1
                     self.kills += 1
                     base_points = {"tank": 2, "shooter": 5, "nugget": 10, "boss": 20, "tempest": 20}.get(enemy.kind, 1)
                     self.points += base_points + self.level("reward") + (self.level("recall_reward") if returning else 0)

@@ -136,3 +136,12 @@ Fullscreen default and saved, reversible equipped ranks address part of B16.
 B14 still needs a full cue identity and independent volume controls. These
 implementations await player acceptance; the remaining backlog remains open.
 Current checklist and validation: `docs/ENCOUNTER_EXPANSION.md`.
+
+## Campaign slice status
+
+B08 is implemented for playtesting: eight named encounters introduce enemy roles,
+pace reinforcements in packs, and offer timed regroup breaks. Following the
+player's feedback, Warden is the midboss and Tempest the finale; their attack
+tuning is retained. Soft enemy separation adapts an idea found in the older Echo
+Archer prototype. Both Boss Practice victories now finish instead of advancing
+into unrelated waves. See `docs/CAMPAIGN_PLAYTEST.md` for acceptance checks.
